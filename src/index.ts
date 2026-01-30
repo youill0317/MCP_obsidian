@@ -345,7 +345,12 @@ server.tool(
                             // 태그/속성 필터링이 필요한 경우
                             if (tag || (property && value)) {
                                 try {
-                                    const content = await fs.readFile(fullPath, "utf8");
+                                    // 프론트매터는 파일 시작 부분에만 있으므로 처음 4KB만 읽음 (성능 최적화)
+                                    const fileHandle = await fs.open(fullPath, "r");
+                                    const buffer = Buffer.alloc(4096);
+                                    const { bytesRead } = await fileHandle.read(buffer, 0, 4096, 0);
+                                    await fileHandle.close();
+                                    const content = buffer.toString("utf8", 0, bytesRead);
                                     const metadata = await parseFrontmatter(content);
 
                                     if (!metadata) continue;
@@ -625,7 +630,8 @@ server.tool(
             }
 
             const toc: TocEntry[] = [];
-            const headerRegex = /^(#{1,6})\s+(.+)$/;
+            // 앞 공백 허용 (Obsidian 호환)
+            const headerRegex = /^\s*(#{1,6})\s+(.+)$/;
             let inCodeBlock = false;
 
             for (let i = 0; i < lines.length; i++) {
@@ -702,7 +708,8 @@ server.tool(
             const lines = content.split(/\r?\n/);
 
             const headerText = header.replace(/^#+\s*/, "").trim();
-            const headerRegex = /^(#{1,6})\s+(.+)$/;
+            // 앞 공백 허용 (Obsidian 호환)
+            const headerRegex = /^\s*(#{1,6})\s+(.+)$/;
 
             let targetLevel = 0;
             let startLine = -1;
@@ -872,7 +879,8 @@ server.tool(
             const lines = content.split(/\r?\n/);
             let inCodeBlock = false;
 
-            const markdownLinkRegex = /\[([^\]]*)\]\(([^)]+)\)/g;
+            // negative lookbehind로 이미지 링크 제외 (중복 카운트 방지)
+            const markdownLinkRegex = /(?<!!)\[([^\]]*)\]\(([^)]+)\)/g;
             const wikiLinkRegex = /(?<!!)\[\[([^\]|]+)(?:\|([^\]]+))?\]\]/g;
             const embedRegex = /!\[\[([^\]]+)\]\]/g;
             const imageRegex = /!\[([^\]]*)\]\(([^)]+)\)/g;

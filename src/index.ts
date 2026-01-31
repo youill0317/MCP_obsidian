@@ -272,7 +272,7 @@ server.tool(
                         const entry = entries[i];
                         const isLast = i === entries.length - 1;
                         const connector = isLast ? "└── " : "├── ";
-                        const icon = entry.isDirectory() ? "📁 " : (isMarkdownFile(entry.name) ? "📝 " : "📄 ");
+                        const icon = entry.isDirectory() ? "[D] " : (isMarkdownFile(entry.name) ? "" : "[?] ");
 
                         lines.push(`${prefix}${connector}${icon}${entry.name}`);
 
@@ -286,7 +286,7 @@ server.tool(
                 }
             }
 
-            lines.push(`📁 ${path.basename(normalizedPath)}/`);
+            lines.push(`${path.basename(normalizedPath)}/`);
             await buildTree(normalizedPath, "", 1);
 
             return {
@@ -462,8 +462,8 @@ server.tool(
 
             if (results.length === 0) {
                 // 결과 없을 때 대안 제시
-                let suggestions = `❌ "${query}" 검색 결과 없음\n\n`;
-                suggestions += `💡 제안:\n`;
+                let suggestions = `"${query}" 검색 결과 없음\n\n`;
+                suggestions += `제안:\n`;
                 suggestions += `  • 다른 검색어 시도\n`;
                 suggestions += `  • 전체 구조 확인: get_directory_tree로 볼트 구조 파악\n`;
 
@@ -481,10 +481,10 @@ server.tool(
             const tagMatches = topResults.filter(r => r.matchTypes.includes("tag"));
             const contentMatches = topResults.filter(r => r.matchTypes.includes("content"));
 
-            let output = `🔍 "${query}" 검색 결과 (${topResults.length}건):\n\n`;
+            let output = `"${query}" 검색 결과 (${topResults.length}건):\n\n`;
 
             if (filenameMatches.length > 0) {
-                output += `📁 파일명 매칭 (${filenameMatches.length}건):\n`;
+                output += `[파일명] (${filenameMatches.length}건):\n`;
                 filenameMatches.forEach(r => {
                     output += `  • ${r.path}\n`;
                 });
@@ -492,7 +492,7 @@ server.tool(
             }
 
             if (tagMatches.length > 0) {
-                output += `🏷️ 태그 매칭 (${tagMatches.length}건):\n`;
+                output += `[태그] (${tagMatches.length}건):\n`;
                 tagMatches.forEach(r => {
                     output += `  • ${r.path} (tags: [${r.tags?.join(", ")}])\n`;
                 });
@@ -500,7 +500,7 @@ server.tool(
             }
 
             if (contentMatches.length > 0) {
-                output += `📝 내용 매칭 (${contentMatches.length}건):\n`;
+                output += `[내용] (${contentMatches.length}건):\n`;
                 contentMatches.forEach(r => {
                     r.contentMatches?.slice(0, 1).forEach(m => {
                         output += `  • ${r.path}:L${m.line}: "${m.text.substring(0, 60)}${m.text.length > 60 ? "..." : ""}"\n`;
@@ -601,7 +601,7 @@ server.tool(
             return {
                 content: [{
                     type: "text",
-                    text: `📑 목차 (${toc.length}개 헤더):\n\n${output}`,
+                    text: `목차 (${toc.length}개 헤더):\n\n${output}`,
                 }],
             };
         } catch (error) {
@@ -684,7 +684,7 @@ server.tool(
                 const sectionContent = sectionLines.join("\n").trim();
                 return {
                     found: true,
-                    content: `--- 📝 ${normalizedPath} | 섹션: ${lines[startLine]} (L${startLine + 1}-${endLine}) ---\n\n${sectionContent}`,
+                    content: `--- ${normalizedPath} | 섹션: ${lines[startLine]} (L${startLine + 1}-${endLine}) ---\n\n${sectionContent}`,
                 };
             }
 
@@ -709,7 +709,7 @@ server.tool(
                     return {
                         content: [{
                             type: "text",
-                            text: `헤더 "${headerText}"를 찾을 수 없습니다.\n\n💡 path 없이 header만 지정하면 전체 파일에서 검색합니다.`,
+                            text: `헤더 "${headerText}"를 찾을 수 없습니다.\n\npath 없이 header만 지정하면 전체 파일에서 검색합니다.`,
                         }],
                         isError: true,
                     };
@@ -774,7 +774,7 @@ server.tool(
                 return {
                     content: [{
                         type: "text",
-                        text: `❌ 헤더 "${headerText}"를 포함하는 파일을 찾을 수 없습니다.\n\n💡 smart_search 도구로 관련 파일을 먼저 찾아보세요.`,
+                        text: `헤더 "${headerText}"를 포함하는 파일을 찾을 수 없습니다.\n\nsearch_markdown 도구로 관련 파일을 먼저 찾아보세요.`,
                     }],
                     isError: true,
                 };
@@ -805,7 +805,7 @@ server.tool(
             return {
                 content: [{
                     type: "text",
-                    text: `🔍 "${headerText}" 섹션 (${results.length}개 파일에서 발견):\n\n${results.join("\n\n")}`,
+                    text: `"${headerText}" 섹션 (${results.length}개 파일에서 발견):\n\n${results.join("\n\n")}`,
                 }],
             };
         } catch (error) {
@@ -902,7 +902,7 @@ server.tool(
                     return {
                         content: [{
                             type: "text",
-                            text: `❌ "${query}" 검색 결과 없음\n\n💡 smart_search 도구로 먼저 파일을 찾아보세요.`,
+                            text: `"${query}" 검색 결과 없음\n\nsearch_markdown 도구로 먼저 파일을 찾아보세요.`,
                         }],
                     };
                 }
@@ -951,13 +951,13 @@ server.tool(
                     const metadata = await parseFrontmatter(content);
                     const body = extractBody(content);
 
-                    let output = `--- 📝 ${normalizedPath} ---\n\n`;
+                    let output = `--- ${normalizedPath} ---\n\n`;
 
                     if (metadata && Object.keys(metadata).length > 0) {
-                        output += `📋 메타데이터:\n${JSON.stringify(metadata, null, 2)}\n\n`;
+                        output += `[메타데이터]\n${JSON.stringify(metadata, null, 2)}\n\n`;
                     }
 
-                    output += `📄 본문:\n${body}\n`;
+                    output += `[본문]\n${body}\n`;
                     results.push(output);
                 } catch (error) {
                     results.push(`--- ${normalizedPath} ---\n[오류: ${error instanceof Error ? error.message : String(error)}]\n`);
@@ -1160,34 +1160,34 @@ server.tool(
                 embed: links.filter(l => l.type === "embed"),
             };
 
-            let output = `🔗 링크 (${links.length}개 발견):\n\n`;
+            let output = `링크 (${links.length}개 발견):\n\n`;
 
             const formatLink = (l: LinkInfo) => {
-                const status = checkExists ? (l.exists ? "✅" : "❌") : "•";
+                const status = checkExists ? (l.exists ? "[O]" : "[X]") : "•";
                 const displayTarget = l.type === "markdown" && !l.target.includes("/") ? `[[${l.target}]]` : l.target;
                 return `  ${status} L${l.line}: ${displayTarget}${l.text ? ` (${l.text})` : ""}`;
             };
 
             if (grouped.markdown.length > 0) {
-                output += `📝 마크다운 링크 (${grouped.markdown.length}개):\n`;
+                output += `[마크다운] (${grouped.markdown.length}개):\n`;
                 grouped.markdown.forEach(l => output += formatLink(l) + "\n");
                 output += "\n";
             }
 
             if (grouped.image.length > 0) {
-                output += `🖼️ 이미지 (${grouped.image.length}개):\n`;
+                output += `[이미지] (${grouped.image.length}개):\n`;
                 grouped.image.forEach(l => output += formatLink(l) + "\n");
                 output += "\n";
             }
 
             if (grouped.external.length > 0) {
-                output += `🌐 외부 링크 (${grouped.external.length}개):\n`;
+                output += `[외부] (${grouped.external.length}개):\n`;
                 grouped.external.forEach(l => output += formatLink(l) + "\n");
                 output += "\n";
             }
 
             if (grouped.embed.length > 0) {
-                output += `📎 임베드 (${grouped.embed.length}개):\n`;
+                output += `[임베드] (${grouped.embed.length}개):\n`;
                 grouped.embed.forEach(l => output += formatLink(l) + "\n");
             }
 

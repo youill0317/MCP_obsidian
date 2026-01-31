@@ -197,74 +197,10 @@ function extractBody(content: string): string {
     return content.replace(frontmatterRegex, "").trim();
 }
 
-// ============================================
-// 도구 1: list_directory
-// ============================================
 
-server.tool(
-    "list_directory",
-    "List only the immediate files and subfolders in a directory (non-recursive). Not a search. For search, use 'search_markdown_files' or 'search_text_in_markdown'. Example: {\"path\":\"docs\"}.",
-    {
-        path: z.string().optional().default(".").describe("Directory path to list. Defaults to base directory if omitted. Example: \"docs\"."),
-    },
-    async ({ path: dirPath }) => {
-        try {
-            const normalizedPath = normalizeAndValidatePath(dirPath);
-            if (normalizedPath === null) {
-                return accessDeniedError(dirPath);
-            }
-
-            if (!(await exists(normalizedPath))) {
-                return pathNotFoundError(normalizedPath);
-            }
-
-            const stats = await fs.stat(normalizedPath);
-            if (!stats.isDirectory()) {
-                return notDirectoryError(normalizedPath);
-            }
-
-            const entries = await fs.readdir(normalizedPath, { withFileTypes: true });
-
-            // 마크다운 파일과 폴더만 필터링
-            const filteredEntries = entries.filter(entry => {
-                if (entry.name.startsWith(".")) return false; // 숨김 파일 제외
-                if (entry.isDirectory()) return true;
-                return isMarkdownFile(entry.name);
-            });
-
-            const items = await Promise.all(
-                filteredEntries.map(async (entry) => {
-                    const fullPath = path.join(normalizedPath, entry.name);
-                    const itemStats = await fs.stat(fullPath).catch(() => null);
-
-                    return {
-                        name: entry.name,
-                        type: entry.isDirectory() ? "directory" : "file",
-                        size: itemStats && !entry.isDirectory() ? formatFileSize(itemStats.size) : undefined,
-                        modified: itemStats ? itemStats.mtime.toISOString() : undefined,
-                    };
-                })
-            );
-
-            items.sort((a, b) => {
-                if (a.type !== b.type) return a.type === "directory" ? -1 : 1;
-                return a.name.localeCompare(b.name);
-            });
-
-            return {
-                content: [{
-                    type: "text",
-                    text: JSON.stringify({ path: normalizedPath, items }, null, 2),
-                }],
-            };
-        } catch (error) {
-            return createErrorResponse(error instanceof Error ? error.message : String(error));
-        }
-    }
-);
 
 // ============================================
-// 도구 2: get_directory_tree
+// 도구 1: get_directory_tree
 // ============================================
 
 server.tool(
@@ -363,170 +299,22 @@ server.tool(
             return createErrorResponse(error instanceof Error ? error.message : String(error));
         }
     }
-);
-
-// ============================================
-// 도구 3: search_markdown_files
+);// ============================================
+// 도구 2: search_markdown (통합 검색)
 // ============================================
 
 server.tool(
-    "search_markdown_files",
-    "Find markdown files by filename pattern and frontmatter (tags/properties). Does not search file contents; use 'search_text_in_markdown' for content search. Example: {\"directory\":\"notes\",\"pattern\":\"*.md\",\"tag\":\"project\"}.",
-    {
-        directory: z.string().optional().default(".").describe("Root directory to search. Defaults to base directory if omitted."),
-        pattern: z.string().optional().default("*").describe("Filename glob pattern (*, ? supported, case-insensitive). Default '*'."),
-        tag: z.string().optional().describe("Tag to match in frontmatter 'tags' array (substring match, case-insensitive)."),
-        property: z.string().optional().describe("Frontmatter key name (use together with value)."),
-        value: z.string().optional().describe("Value to match for the property (substring match, case-insensitive)."),
-        maxDepth: z.number().optional().default(10).describe("Maximum directory depth to search (integer >= 0; large values are slower)."),
-        respectGitignore: z.boolean().optional().default(true).describe("Apply .gitignore rules."),
-    },
-    async ({ directory, pattern, tag, property, value, maxDepth, respectGitignore }) => {
-        try {
-            const validatedPath = normalizeAndValidatePath(directory);
-            if (validatedPath === null) {
-                return accessDeniedError(directory);
-            }
-            const normalizedPath = validatedPath;
-
-            if (!(await exists(normalizedPath))) {
-                return pathNotFoundError(normalizedPath);
-            }
-
-            const stats = await fs.stat(normalizedPath);
-            if (!stats.isDirectory()) {
-                return notDirectoryError(normalizedPath);
-            }
-
-            if ((property && !value) || (!property && value)) {
-                return createErrorResponse("Both 'property' and 'value' must be provided together.");
-            }
-
-            if (pattern.trim().length == 0) {
-                return createErrorResponse("pattern must be a non-empty glob string.");
-            }
-
-            if (!Number.isInteger(maxDepth) || maxDepth < 0) {
-                return createErrorResponse("maxDepth must be an integer >= 0.");
-            }
-
-            const results: { path: string; metadata?: Record<string, unknown> }[] = [];
-            const ig = respectGitignore ? await loadGitignore(normalizedPath) : null;
-
-            // 파일명 패턴을 정규식으로 변환
-            const regexPattern = pattern
-                .replace(/[.+^${}()|[\]\\]/g, "\\$&")
-                .replace(/\*/g, ".*")
-                .replace(/\?/g, ".");
-            const regex = new RegExp(`^${regexPattern}$`, "i");
-
-            async function searchDir(dir: string, depth: number): Promise<void> {
-                if (depth > maxDepth) return;
-
-                try {
-                    const entries = await fs.readdir(dir, { withFileTypes: true });
-
-                    for (const entry of entries) {
-                        const fullPath = path.join(dir, entry.name);
-                        const relativePath = path.relative(normalizedPath, fullPath);
-
-                        if (ig && ig.ignores(relativePath)) continue;
-
-                        if (entry.isDirectory()) {
-                            await searchDir(fullPath, depth + 1);
-                        } else if (entry.isFile() && isMarkdownFile(entry.name)) {
-                            // 파일명 패턴 매칭
-                            if (!regex.test(entry.name)) continue;
-
-                            // 태그/속성 필터링이 필요한 경우
-                            if (tag || (property && value)) {
-                                try {
-                                    // 프론트매터는 파일 시작 부분에만 있으므로 처음 4KB만 읽음 (성능 최적화)
-                                    const fileHandle = await fs.open(fullPath, "r");
-                                    const buffer = Buffer.alloc(4096);
-                                    const { bytesRead } = await fileHandle.read(buffer, 0, 4096, 0);
-                                    await fileHandle.close();
-                                    const content = buffer.toString("utf8", 0, bytesRead);
-                                    const metadata = await parseFrontmatter(content);
-
-                                    if (!metadata) continue;
-
-                                    // 태그 필터
-                                    if (tag) {
-                                        const tags = metadata.tags;
-                                        if (!Array.isArray(tags)) continue;
-                                        if (!tags.some(t => String(t).toLowerCase().includes(tag.toLowerCase()))) continue;
-                                    }
-
-                                    // 속성 필터
-                                    if (property && value) {
-                                        const propValue = metadata[property];
-                                        if (propValue === undefined) continue;
-
-                                        if (Array.isArray(propValue)) {
-                                            if (!propValue.some(v => String(v).toLowerCase().includes(value.toLowerCase()))) continue;
-                                        } else {
-                                            if (!String(propValue).toLowerCase().includes(value.toLowerCase())) continue;
-                                        }
-                                    }
-
-                                    results.push({ path: fullPath, metadata });
-                                } catch {
-                                    continue;
-                                }
-                            } else {
-                                results.push({ path: fullPath });
-                            }
-                        }
-                    }
-                } catch {
-                    // 접근 권한 없는 디렉토리는 무시
-                }
-            }
-
-            await searchDir(normalizedPath, 0);
-
-            if (results.length === 0) {
-                let msg = `마크다운 파일을 찾지 못했습니다.`;
-                if (tag) msg += ` (태그: ${tag})`;
-                if (property && value) msg += ` (${property}: ${value})`;
-                return {
-                    content: [{ type: "text", text: msg }],
-                };
-            }
-
-            let output = `🔍 검색 결과 (${results.length}개 파일):\n\n`;
-            for (const r of results) {
-                output += `📝 ${r.path}\n`;
-                if (r.metadata) {
-                    if (r.metadata.title) output += `   제목: ${r.metadata.title}\n`;
-                    if (r.metadata.tags) output += `   태그: ${JSON.stringify(r.metadata.tags)}\n`;
-                }
-            }
-
-            return {
-                content: [{ type: "text", text: output.trim() }],
-            };
-        } catch (error) {
-            return createErrorResponse(error instanceof Error ? error.message : String(error));
-        }
-    }
-);
-
-// ============================================
-// 도구 4: smart_search (통합 검색)
-// ============================================
-
-server.tool(
-    "smart_search",
-    "🔍 RECOMMENDED: Unified search that checks filename, tags, AND content in ONE call. Use this as your PRIMARY search tool instead of separate search tools. Returns results grouped by match type with relevance. Example: {\"query\":\"project\"}.",
+    "search_markdown",
+    "🔍 Unified search for markdown files. Searches filename, tags, AND content in ONE call. Supports optional filters for tags and filename patterns. Example: {\"query\":\"project\"} or {\"query\":\"회의\", \"tag\":\"work\"}.",
     {
         query: z.string().describe("Search query - searches filename, frontmatter tags, and file content simultaneously."),
+        tag: z.string().optional().describe("Filter by tag in frontmatter (substring match, case-insensitive)."),
+        filenamePattern: z.string().optional().describe("Filename glob pattern filter (*, ? supported). Example: \"*회의*\"."),
         directory: z.string().optional().default(".").describe("Root directory to search. Defaults to base directory."),
         maxResults: z.number().optional().default(10).describe("Maximum total results to return (integer > 0)."),
         respectGitignore: z.boolean().optional().default(true).describe("Apply .gitignore rules."),
     },
-    async ({ query, directory, maxResults, respectGitignore }) => {
+    async ({ query, tag, filenamePattern, directory, maxResults, respectGitignore }) => {
         try {
             const validatedPath = normalizeAndValidatePath(directory);
             if (validatedPath === null) {
@@ -543,7 +331,18 @@ server.tool(
             }
 
             const queryLower = query.toLowerCase();
+            const tagLower = tag?.toLowerCase();
             const ig = respectGitignore ? await loadGitignore(normalizedPath) : null;
+
+            // 파일명 패턴 정규식 (옵션)
+            let filenameRegex: RegExp | null = null;
+            if (filenamePattern) {
+                const regexPattern = filenamePattern
+                    .replace(/[.+^${}()|[\]\\]/g, "\\$&")
+                    .replace(/\*/g, ".*")
+                    .replace(/\?/g, ".");
+                filenameRegex = new RegExp(`^${regexPattern}$`, "i");
+            }
 
             interface SearchResult {
                 path: string;
@@ -556,6 +355,11 @@ server.tool(
             const results: SearchResult[] = [];
 
             async function searchFile(filePath: string, fileName: string): Promise<void> {
+                // 파일명 패턴 필터
+                if (filenameRegex && !filenameRegex.test(fileName)) {
+                    return;
+                }
+
                 const result: SearchResult = {
                     path: filePath,
                     matchTypes: [],
@@ -565,7 +369,7 @@ server.tool(
                 // 1. 파일명 매칭
                 if (fileName.toLowerCase().includes(queryLower)) {
                     result.matchTypes.push("filename");
-                    result.score += 10; // 파일명 매칭은 높은 점수
+                    result.score += 10;
                 }
 
                 // 2. 프론트매터 및 내용 검색 (처음 8KB만 읽어서 성능 최적화)
@@ -576,17 +380,34 @@ server.tool(
                     await fileHandle.close();
                     const content = buffer.toString("utf8", 0, bytesRead);
 
-                    // 태그 검색
+                    // 태그 검색 및 필터
                     const metadata = await parseFrontmatter(content);
                     if (metadata?.tags && Array.isArray(metadata.tags)) {
+                        // 태그 필터가 있으면 필터 먼저 적용
+                        if (tagLower) {
+                            const hasTag = metadata.tags.some(t =>
+                                String(t).toLowerCase().includes(tagLower)
+                            );
+                            if (!hasTag) return; // 태그 필터 미통과 시 제외
+                        }
+
+                        // 쿼리로 태그 매칭
                         const matchedTags = metadata.tags.filter(t =>
                             String(t).toLowerCase().includes(queryLower)
                         );
                         if (matchedTags.length > 0) {
                             result.matchTypes.push("tag");
                             result.tags = matchedTags.map(String);
-                            result.score += 8; // 태그 매칭
+                            result.score += 8;
+                        } else if (tagLower) {
+                            // 태그 필터는 통과했지만 쿼리 매칭은 아님 - 태그 정보만 저장
+                            result.tags = metadata.tags.filter(t =>
+                                String(t).toLowerCase().includes(tagLower)
+                            ).map(String);
                         }
+                    } else if (tagLower) {
+                        // 태그 필터가 있는데 파일에 태그가 없으면 제외
+                        return;
                     }
 
                     // 내용 검색 (첫 3개 매칭만)
@@ -697,213 +518,10 @@ server.tool(
     }
 );
 
-// ============================================
-// 도구 5: search_text_in_markdown
-// ============================================
 
-server.tool(
-    "search_text_in_markdown",
-    "Search for a literal string in markdown text (body + frontmatter). Not a regex search. For filename search, use 'search_markdown_files'. Example: {\"directory\":\"notes\",\"query\":\"TODO\"}.",
-    {
-        directory: z.string().optional().default(".").describe("Root directory to search. Defaults to base directory if omitted."),
-        query: z.string().describe("Literal text to find (non-empty, no regex)."),
-        caseSensitive: z.boolean().optional().default(false).describe("Case-sensitive matching."),
-        contextBefore: z.number().optional().default(0).describe("Number of lines to include before each match (integer >= 0)."),
-        contextAfter: z.number().optional().default(0).describe("Number of lines to include after each match (integer >= 0)."),
-        maxResults: z.number().optional().describe("Maximum total matches to return (integer > 0; stop early if reached)."),
-        respectGitignore: z.boolean().optional().default(true).describe("Apply .gitignore rules."),
-    },
-    async ({ directory, query, caseSensitive, contextBefore, contextAfter, maxResults, respectGitignore }) => {
-        try {
-            const validatedPath = normalizeAndValidatePath(directory);
-            if (validatedPath === null) {
-                return accessDeniedError(directory);
-            }
-            const normalizedPath = validatedPath;
-            const startTime = Date.now();
-
-            if (!(await exists(normalizedPath))) {
-                return pathNotFoundError(normalizedPath);
-            }
-
-            const stats = await fs.stat(normalizedPath);
-            if (!stats.isDirectory()) {
-                return notDirectoryError(normalizedPath);
-            }
-
-            if (!query || query.trim().length == 0) {
-                return createErrorResponse("query must be a non-empty string.");
-            }
-
-            if (!Number.isInteger(contextBefore) || contextBefore < 0) {
-                return createErrorResponse("contextBefore must be an integer >= 0.");
-            }
-
-            if (!Number.isInteger(contextAfter) || contextAfter < 0) {
-                return createErrorResponse("contextAfter must be an integer >= 0.");
-            }
-
-            if (maxResults !== undefined && (!Number.isInteger(maxResults) || maxResults < 1)) {
-                return createErrorResponse("maxResults must be an integer >= 1.");
-            }
-
-            const flags = caseSensitive ? "g" : "gi";
-            const regex = new RegExp(escapeRegex(query), flags);
-
-            const ig = respectGitignore ? await loadGitignore(normalizedPath) : null;
-
-            interface SearchMatch {
-                file: string;
-                line: number;
-                content: string;
-                contextBefore?: string[];
-                contextAfter?: string[];
-            }
-
-            const results: SearchMatch[] = [];
-            let filesSearched = 0;
-            let filesMatched = 0;
-
-            async function searchInFile(filePath: string): Promise<void> {
-                return new Promise((resolve) => {
-                    const matches: SearchMatch[] = [];
-                    const allLines: string[] = [];
-                    const pendingAfterContext: Map<number, { match: SearchMatch; linesNeeded: number }> = new Map();
-                    let lineNumber = 0;
-                    let matchIndex = 0;
-
-                    const rl = readline.createInterface({
-                        input: createReadStream(filePath, { encoding: "utf8" }),
-                        crlfDelay: Infinity,
-                    });
-
-                    rl.on("line", (line) => {
-                        lineNumber++;
-                        allLines.push(line);
-
-                        // 진행 중인 contextAfter 수집
-                        for (const [idx, pending] of pendingAfterContext) {
-                            pending.match.contextAfter = pending.match.contextAfter || [];
-                            pending.match.contextAfter.push(line);
-                            pending.linesNeeded--;
-                            if (pending.linesNeeded === 0) {
-                                pendingAfterContext.delete(idx);
-                            }
-                        }
-
-                        // 라인 버퍼 크기 제한
-                        const maxBuffer = contextBefore + 100;
-                        if (allLines.length > maxBuffer) {
-                            allLines.shift();
-                        }
-
-                        regex.lastIndex = 0;
-                        if (regex.test(line)) {
-                            const match: SearchMatch = {
-                                file: filePath,
-                                line: lineNumber,
-                                content: line.trim(),
-                            };
-
-                            if (contextBefore > 0) {
-                                const startIdx = Math.max(0, allLines.length - 1 - contextBefore);
-                                match.contextBefore = allLines.slice(startIdx, allLines.length - 1);
-                            }
-
-                            matches.push(match);
-
-                            if (contextAfter > 0) {
-                                pendingAfterContext.set(matchIndex, { match, linesNeeded: contextAfter });
-                            }
-                            matchIndex++;
-                        }
-                    });
-
-                    rl.on("close", () => {
-                        if (matches.length > 0) {
-                            filesMatched++;
-                            results.push(...matches);
-                        }
-                        resolve();
-                    });
-
-                    rl.on("error", () => resolve());
-                });
-            }
-
-            async function walkDir(dir: string): Promise<void> {
-                if (maxResults && results.length >= maxResults) return;
-
-                try {
-                    const entries = await fs.readdir(dir, { withFileTypes: true });
-
-                    for (const entry of entries) {
-                        if (maxResults && results.length >= maxResults) break;
-
-                        const fullPath = path.join(dir, entry.name);
-                        const relativePath = path.relative(normalizedPath, fullPath);
-
-                        if (ig && ig.ignores(relativePath)) continue;
-
-                        if (entry.isDirectory()) {
-                            await walkDir(fullPath);
-                        } else if (entry.isFile() && isMarkdownFile(entry.name)) {
-                            filesSearched++;
-                            await searchInFile(fullPath);
-                        }
-                    }
-                } catch {
-                    // 접근 권한 없는 디렉토리는 무시
-                }
-            }
-
-            await walkDir(normalizedPath);
-
-            const elapsedMs = Date.now() - startTime;
-
-            if (results.length === 0) {
-                return {
-                    content: [{
-                        type: "text",
-                        text: `"${query}"를 포함하는 마크다운 파일을 찾지 못했습니다.\n\n` +
-                            `📊 통계: 검색한 파일 ${filesSearched}개, 소요 시간 ${elapsedMs}ms`
-                    }],
-                };
-            }
-
-            let output = "";
-            for (const match of results) {
-                if (match.contextBefore && match.contextBefore.length > 0) {
-                    const startLine = match.line - match.contextBefore.length;
-                    match.contextBefore.forEach((line, i) => {
-                        output += `${match.file}:${startLine + i}: ${line}\n`;
-                    });
-                }
-                output += `${match.file}:${match.line}: ${match.content}\n`;
-                if (match.contextAfter && match.contextAfter.length > 0) {
-                    match.contextAfter.forEach((line, i) => {
-                        output += `${match.file}:${match.line + 1 + i}: ${line}\n`;
-                    });
-                }
-                output += "\n";
-            }
-
-            return {
-                content: [{
-                    type: "text",
-                    text: `검색 결과 (${results.length}개 매칭, ${filesMatched}개 파일):\n\n` +
-                        output +
-                        `📊 통계: 검색한 파일 ${filesSearched}개, 소요 시간 ${elapsedMs}ms`,
-                }],
-            };
-        } catch (error) {
-            return createErrorResponse(error instanceof Error ? error.message : String(error));
-        }
-    }
-);
 
 // ============================================
-// 도구 5: read_markdown_toc
+// 도구 3: read_markdown_toc
 // ============================================
 
 server.tool(
@@ -994,7 +612,7 @@ server.tool(
 );
 
 // ============================================
-// 도구 6: read_markdown_section
+// 도구 4: read_markdown_section
 // ============================================
 
 server.tool(
@@ -1198,7 +816,7 @@ server.tool(
 );
 
 // ============================================
-// 도구 7: read_markdown_full
+// 도구 5: read_markdown_full
 // ============================================
 
 server.tool(
@@ -1360,7 +978,7 @@ server.tool(
 );
 
 // ============================================
-// 도구 8: get_linked_files
+// 도구 6: get_linked_files
 // ============================================
 
 server.tool(

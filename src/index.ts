@@ -150,9 +150,9 @@ function extractBody(content: string): string {
 
 server.tool(
     "list_directory",
-    "디렉토리의 파일 및 하위 디렉토리 목록을 조회합니다",
+    "List only the immediate files and subfolders in a directory (non-recursive). Not a search. For search, use 'search_markdown_files' or 'search_text_in_markdown'. Example: {\"path\":\"docs\"}.",
     {
-        path: z.string().describe("조회할 디렉토리 경로"),
+        path: z.string().describe("Directory path to list (must exist and be a directory). No glob/search; file paths are not allowed. Example: \"docs\"."),
     },
     async ({ path: dirPath }) => {
         try {
@@ -207,13 +207,13 @@ server.tool(
 
 server.tool(
     "get_directory_tree",
-    "디렉토리 구조를 트리 형태로 보여줍니다",
+    "Show the directory structure as a tree (does not read file contents). For overview only, not search. Example: {\"path\":\"docs\",\"depth\":2}.",
     {
-        path: z.string().describe("트리를 생성할 디렉토리 경로"),
-        depth: z.number().optional().default(3).describe("표시할 깊이 (기본: 3)"),
-        markdownOnly: z.boolean().optional().default(false).describe("마크다운 파일만 표시"),
-        showHidden: z.boolean().optional().default(false).describe("숨김 파일 표시 여부"),
-        respectGitignore: z.boolean().optional().default(true).describe(".gitignore 규칙 존중 여부"),
+        path: z.string().describe("Root directory path for the tree (must be a directory)."),
+        depth: z.number().optional().default(3).describe("Maximum depth to display (integer >= 1). Larger values increase output size/tokens (default 3)."),
+        markdownOnly: z.boolean().optional().default(false).describe("If true, show only markdown files (.md/.mdx/.markdown) while keeping directories."),
+        showHidden: z.boolean().optional().default(false).describe("Include hidden entries (names starting with .)."),
+        respectGitignore: z.boolean().optional().default(true).describe("Apply .gitignore rules to exclude paths."),
     },
     async ({ path: dirPath, depth, markdownOnly, showHidden, respectGitignore }) => {
         try {
@@ -221,6 +221,15 @@ server.tool(
 
             if (!(await exists(normalizedPath))) {
                 return pathNotFoundError(normalizedPath);
+            }
+
+            const stats = await fs.stat(normalizedPath);
+            if (!stats.isDirectory()) {
+                return notDirectoryError(normalizedPath);
+            }
+
+            if (!Number.isInteger(depth) || depth < 1) {
+                return createErrorResponse("depth must be an integer >= 1.");
             }
 
             const lines: string[] = [];
@@ -296,15 +305,15 @@ server.tool(
 
 server.tool(
     "search_markdown_files",
-    "마크다운 파일을 검색합니다 (파일명 패턴 및 프론트매터 태그/속성 필터링 지원)",
+    "Find markdown files by filename pattern and frontmatter (tags/properties). Does not search file contents; use 'search_text_in_markdown' for content search. Example: {\"directory\":\"notes\",\"pattern\":\"*.md\",\"tag\":\"project\"}.",
     {
-        directory: z.string().describe("검색할 디렉토리 경로"),
-        pattern: z.string().optional().default("*").describe("파일명 패턴 (예: *.md, 회의록*)"),
-        tag: z.string().optional().describe("프론트매터 tags에서 검색할 태그"),
-        property: z.string().optional().describe("프론트매터 속성명 (예: 'author', 'category')"),
-        value: z.string().optional().describe("속성값 (property와 함께 사용)"),
-        maxDepth: z.number().optional().default(10).describe("최대 검색 깊이"),
-        respectGitignore: z.boolean().optional().default(true).describe(".gitignore 규칙 존중 여부"),
+        directory: z.string().describe("Root directory to search (must be a directory)."),
+        pattern: z.string().optional().default("*").describe("Filename glob pattern (*, ? supported, case-insensitive). Default '*'."),
+        tag: z.string().optional().describe("Tag to match in frontmatter 'tags' array (substring match, case-insensitive)."),
+        property: z.string().optional().describe("Frontmatter key name (use together with value)."),
+        value: z.string().optional().describe("Value to match for the property (substring match, case-insensitive)."),
+        maxDepth: z.number().optional().default(10).describe("Maximum directory depth to search (integer >= 0; large values are slower)."),
+        respectGitignore: z.boolean().optional().default(true).describe("Apply .gitignore rules."),
     },
     async ({ directory, pattern, tag, property, value, maxDepth, respectGitignore }) => {
         try {
@@ -312,6 +321,23 @@ server.tool(
 
             if (!(await exists(normalizedPath))) {
                 return pathNotFoundError(normalizedPath);
+            }
+
+            const stats = await fs.stat(normalizedPath);
+            if (!stats.isDirectory()) {
+                return notDirectoryError(normalizedPath);
+            }
+
+            if ((property && !value) || (!property && value)) {
+                return createErrorResponse("Both 'property' and 'value' must be provided together.");
+            }
+
+            if (pattern.trim().length == 0) {
+                return createErrorResponse("pattern must be a non-empty glob string.");
+            }
+
+            if (!Number.isInteger(maxDepth) || maxDepth < 0) {
+                return createErrorResponse("maxDepth must be an integer >= 0.");
             }
 
             const results: { path: string; metadata?: Record<string, unknown> }[] = [];
@@ -423,15 +449,15 @@ server.tool(
 
 server.tool(
     "search_text_in_markdown",
-    "마크다운 파일 내용에서 텍스트를 검색합니다",
+    "Search for a literal string in markdown text (body + frontmatter). Not a regex search. For filename search, use 'search_markdown_files'. Example: {\"directory\":\"notes\",\"query\":\"TODO\"}.",
     {
-        directory: z.string().describe("검색할 디렉토리 경로"),
-        query: z.string().describe("검색할 텍스트"),
-        caseSensitive: z.boolean().optional().default(false).describe("대소문자 구분 여부"),
-        contextBefore: z.number().optional().default(0).describe("매칭 라인 앞에 표시할 줄 수"),
-        contextAfter: z.number().optional().default(0).describe("매칭 라인 뒤에 표시할 줄 수"),
-        maxResults: z.number().optional().describe("최대 결과 수"),
-        respectGitignore: z.boolean().optional().default(true).describe(".gitignore 규칙 존중 여부"),
+        directory: z.string().describe("Root directory to search (must be a directory)."),
+        query: z.string().describe("Literal text to find (non-empty, no regex)."),
+        caseSensitive: z.boolean().optional().default(false).describe("Case-sensitive matching."),
+        contextBefore: z.number().optional().default(0).describe("Number of lines to include before each match (integer >= 0)."),
+        contextAfter: z.number().optional().default(0).describe("Number of lines to include after each match (integer >= 0)."),
+        maxResults: z.number().optional().describe("Maximum total matches to return (integer > 0; stop early if reached)."),
+        respectGitignore: z.boolean().optional().default(true).describe("Apply .gitignore rules."),
     },
     async ({ directory, query, caseSensitive, contextBefore, contextAfter, maxResults, respectGitignore }) => {
         try {
@@ -440,6 +466,27 @@ server.tool(
 
             if (!(await exists(normalizedPath))) {
                 return pathNotFoundError(normalizedPath);
+            }
+
+            const stats = await fs.stat(normalizedPath);
+            if (!stats.isDirectory()) {
+                return notDirectoryError(normalizedPath);
+            }
+
+            if (!query || query.trim().length == 0) {
+                return createErrorResponse("query must be a non-empty string.");
+            }
+
+            if (!Number.isInteger(contextBefore) || contextBefore < 0) {
+                return createErrorResponse("contextBefore must be an integer >= 0.");
+            }
+
+            if (!Number.isInteger(contextAfter) || contextAfter < 0) {
+                return createErrorResponse("contextAfter must be an integer >= 0.");
+            }
+
+            if (maxResults !== undefined && (!Number.isInteger(maxResults) || maxResults < 1)) {
+                return createErrorResponse("maxResults must be an integer >= 1.");
             }
 
             const flags = caseSensitive ? "g" : "gi";
@@ -603,10 +650,10 @@ server.tool(
 
 server.tool(
     "read_markdown_toc",
-    "마크다운 파일의 헤더를 추출하여 목차(TOC)를 트리 구조로 반환합니다",
+    "Extract headers (H1-H6) to build a table of contents. Ignores headers inside code blocks. Example: {\"path\":\"README.md\",\"maxLevel\":3}.",
     {
-        path: z.string().describe("마크다운 파일 경로"),
-        maxLevel: z.number().optional().default(6).describe("추출할 최대 헤더 레벨 (1-6)"),
+        path: z.string().describe("Markdown file path (must be a file)."),
+        maxLevel: z.number().optional().default(6).describe("Maximum header level to include (1-6)."),
     },
     async ({ path: filePath, maxLevel }) => {
         try {
@@ -618,6 +665,10 @@ server.tool(
 
             if (!isMarkdownFile(normalizedPath)) {
                 return notMarkdownError(normalizedPath);
+            }
+
+            if (!Number.isInteger(maxLevel) || maxLevel < 1 || maxLevel > 6) {
+                return createErrorResponse("maxLevel must be an integer between 1 and 6.");
             }
 
             const content = await fs.readFile(normalizedPath, "utf8");
@@ -686,11 +737,11 @@ server.tool(
 
 server.tool(
     "read_markdown_section",
-    "마크다운 파일에서 특정 헤더의 섹션만 읽어서 반환합니다",
+    "Read only the section under a specific header. Header text must match exactly (case-insensitive). Optionally include subsections. Example: {\"path\":\"README.md\",\"header\":\"Installation\"}.",
     {
-        path: z.string().describe("마크다운 파일 경로"),
-        header: z.string().describe("읽을 섹션의 헤더 텍스트 (예: '설치 방법', '## 설치 방법')"),
-        includeSubsections: z.boolean().optional().default(true).describe("하위 섹션 포함 여부"),
+        path: z.string().describe("Markdown file path."),
+        header: z.string().describe("Header text to find (non-empty). Leading '#' is ignored."),
+        includeSubsections: z.boolean().optional().default(true).describe("If true, include subsections; if false, only the exact section."),
     },
     async ({ path: filePath, header, includeSubsections }) => {
         try {
@@ -708,6 +759,9 @@ server.tool(
             const lines = content.split(/\r?\n/);
 
             const headerText = header.replace(/^#+\s*/, "").trim();
+            if (!headerText) {
+                return createErrorResponse("header must be a non-empty string.");
+            }
             // 앞 공백 허용 (Obsidian 호환)
             const headerRegex = /^\s*(#{1,6})\s+(.+)$/;
 
@@ -780,14 +834,20 @@ server.tool(
 
 server.tool(
     "read_markdown_full",
-    "마크다운 파일 전체를 읽습니다 (프론트매터 메타데이터 파싱 포함). 단일 파일 또는 여러 파일을 한 번에 읽을 수 있습니다.",
+    "Read entire markdown file(s) and return frontmatter + body. If you only need a part, prefer 'read_markdown_section'. Example: {\"path\":\"README.md\"} or {\"paths\":[\"a.md\",\"b.md\"]}.",
     {
-        path: z.string().optional().describe("단일 파일 경로"),
-        paths: z.array(z.string()).optional().describe("여러 파일 경로 배열"),
+        path: z.string().optional().describe("Single file path. Use either 'path' or 'paths', not both."),
+        paths: z.array(z.string()).optional().describe("Array of file paths. Use either 'path' or 'paths', not both."),
     },
     async ({ path: singlePath, paths: multiplePaths }) => {
         try {
             // path 또는 paths 중 하나는 필수
+            if (singlePath && multiplePaths) {
+                return createErrorResponse("Provide either 'path' or 'paths', not both.");
+            }
+            if (multiplePaths && multiplePaths.length === 0) {
+                return createErrorResponse("'paths' must contain at least one path.");
+            }
             const filePaths = multiplePaths || (singlePath ? [singlePath] : []);
 
             if (filePaths.length === 0) {
@@ -845,11 +905,11 @@ server.tool(
 
 server.tool(
     "get_linked_files",
-    "마크다운 파일의 모든 링크를 추출합니다 (일반 링크, 위키 링크, 이미지, 임베드 포함)",
+    "Extract links, wiki links, images, and embeds from a markdown file. Optionally check whether targets exist. Example: {\"path\":\"README.md\",\"type\":\"markdown\"}.",
     {
-        path: z.string().describe("마크다운 파일 경로"),
-        type: z.enum(["all", "markdown", "image", "external", "embed"]).optional().default("all").describe("추출할 링크 타입"),
-        checkExists: z.boolean().optional().default(false).describe("링크된 파일 존재 여부 확인"),
+        path: z.string().describe("Markdown file path."),
+        type: z.enum(["all", "markdown", "image", "external", "embed"]).optional().default("all").describe("Filter: all | markdown | image | external | embed."),
+        checkExists: z.boolean().optional().default(false).describe("If true, verify link targets exist (relative paths are resolved from the file; slower)."),
     },
     async ({ path: filePath, type, checkExists }) => {
         try {

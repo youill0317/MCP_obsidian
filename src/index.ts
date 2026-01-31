@@ -305,7 +305,7 @@ server.tool(
 
 server.tool(
     "search_markdown",
-    "🔍 Unified search for markdown files. Searches filename, tags, AND content in ONE call. Supports optional filters for tags and filename patterns. Example: {\"query\":\"project\"} or {\"query\":\"회의\", \"tag\":\"work\"}.",
+    "Unified search for markdown files. Searches filename, tags, AND content in ONE call. Supports optional filters for tags and filename patterns. Example: {\"query\":\"project\"} or {\"query\":\"회의\", \"tag\":\"work\"}.",
     {
         query: z.string().describe("Search query - searches filename, frontmatter tags, and file content simultaneously."),
         tag: z.string().optional().describe("Filter by tag in frontmatter (substring match, case-insensitive)."),
@@ -465,8 +465,7 @@ server.tool(
                 let suggestions = `❌ "${query}" 검색 결과 없음\n\n`;
                 suggestions += `💡 제안:\n`;
                 suggestions += `  • 다른 검색어 시도\n`;
-                suggestions += `  • 경로 확인: get_directory_tree로 구조 파악\n`;
-                suggestions += `  • 전체 파일 목록: search_markdown_files(pattern="*")\n`;
+                suggestions += `  • 전체 구조 확인: get_directory_tree로 볼트 구조 파악\n`;
 
                 return {
                     content: [{ type: "text", text: suggestions }],

@@ -24,11 +24,17 @@ const MARKDOWN_EXTENSIONS = [".md", ".mdx", ".markdown"];
 /**
  * Base 디렉토리 설정
  * 환경변수 MARKDOWN_BASE_DIR이 설정되면 상대 경로는 이 디렉토리를 기준으로 해석됩니다.
+ * 세미콜론(;)으로 구분하여 여러 디렉토리를 지정할 수 있습니다.
+ * 예: "C:\Vault1;C:\Vault2;C:\Vault3"
+ * 첫 번째 경로가 상대 경로 해석의 기본 기준이 됩니다.
  * 설정되지 않으면 MCP 서버의 현재 작업 디렉토리(cwd)를 사용합니다.
  */
-const BASE_DIR = process.env.MARKDOWN_BASE_DIR
-    ? path.resolve(process.env.MARKDOWN_BASE_DIR)
-    : process.cwd();
+const BASE_DIRS: string[] = process.env.MARKDOWN_BASE_DIR
+    ? process.env.MARKDOWN_BASE_DIR.split(";").map(d => path.resolve(d.trim())).filter(d => d.length > 0)
+    : [process.cwd()];
+
+/** 첫 번째 BASE_DIR (상대 경로 해석 기준) */
+const PRIMARY_BASE_DIR = BASE_DIRS[0];
 
 // ============================================
 // 유틸리티 함수
@@ -43,22 +49,22 @@ function normalizePath(inputPath: string): string {
     if (path.isAbsolute(inputPath)) {
         return path.resolve(inputPath);
     }
-    return path.resolve(BASE_DIR, inputPath);
+    return path.resolve(PRIMARY_BASE_DIR, inputPath);
 }
 
 /**
- * 경로가 BASE_DIR 내부에 있는지 검증합니다.
- * 보안: BASE_DIR 외부 접근을 차단합니다.
+ * 경로가 허용된 BASE_DIRS 중 하나의 내부에 있는지 검증합니다.
+ * 보안: 모든 허용 디렉토리 외부 접근을 차단합니다.
  */
 function isPathWithinBaseDir(normalizedPath: string): boolean {
-    const resolvedBase = path.resolve(BASE_DIR);
     const resolvedPath = path.resolve(normalizedPath);
-
-    // Windows에서 대소문자 무시
-    const baseLower = resolvedBase.toLowerCase();
     const pathLower = resolvedPath.toLowerCase();
 
-    return pathLower === baseLower || pathLower.startsWith(baseLower + path.sep);
+    return BASE_DIRS.some(baseDir => {
+        const baseLower = path.resolve(baseDir).toLowerCase();
+        // Windows에서 대소문자 무시
+        return pathLower === baseLower || pathLower.startsWith(baseLower + path.sep);
+    });
 }
 
 /**
@@ -77,8 +83,9 @@ function normalizeAndValidatePath(inputPath: string): string | null {
  * BASE_DIR 외부 접근 시 에러 응답 생성
  */
 function accessDeniedError(inputPath: string) {
+    const allowedDirs = BASE_DIRS.join(", ");
     return createErrorResponse(
-        `접근이 거부되었습니다: "${inputPath}"는 허용된 디렉토리(${BASE_DIR}) 외부에 있습니다.`
+        `접근이 거부되었습니다: "${inputPath}"는 허용된 디렉토리(${allowedDirs}) 외부에 있습니다.`
     );
 }
 
@@ -1212,26 +1219,27 @@ server.resource(
     "mcp://markdown-explorer-mcp/vault-context",
     async (uri) => {
         try {
-            const ig = await loadGitignore(BASE_DIR);
-
-            // 1. 최상위 폴더 구조
+            // 1. 최상위 폴더 구조 (모든 BASE_DIRS에서 수집)
             const topLevelDirs: string[] = [];
             const topLevelFiles: string[] = [];
 
-            try {
-                const entries = await fs.readdir(BASE_DIR, { withFileTypes: true });
-                for (const entry of entries) {
-                    if (entry.name.startsWith(".")) continue;
-                    if (ig.ignores(entry.name)) continue;
+            for (const baseDir of BASE_DIRS) {
+                try {
+                    const ig = await loadGitignore(baseDir);
+                    const entries = await fs.readdir(baseDir, { withFileTypes: true });
+                    for (const entry of entries) {
+                        if (entry.name.startsWith(".")) continue;
+                        if (ig.ignores(entry.name)) continue;
 
-                    if (entry.isDirectory()) {
-                        topLevelDirs.push(entry.name);
-                    } else if (isMarkdownFile(entry.name)) {
-                        topLevelFiles.push(entry.name);
+                        if (entry.isDirectory()) {
+                            topLevelDirs.push(`[${path.basename(baseDir)}] ${entry.name}`);
+                        } else if (isMarkdownFile(entry.name)) {
+                            topLevelFiles.push(`[${path.basename(baseDir)}] ${entry.name}`);
+                        }
                     }
+                } catch {
+                    // 디렉토리 읽기 실패 시 무시
                 }
-            } catch {
-                // 디렉토리 읽기 실패 시 무시
             }
 
             // 2. 최근 수정된 파일 (최대 10개)
@@ -1241,24 +1249,24 @@ server.resource(
             }
             const recentFiles: FileInfo[] = [];
 
-            async function collectRecentFiles(dir: string, depth: number): Promise<void> {
+            async function collectRecentFiles(baseDir: string, dir: string, ig: Ignore, depth: number): Promise<void> {
                 if (depth > 5 || recentFiles.length >= 50) return;
 
                 try {
                     const entries = await fs.readdir(dir, { withFileTypes: true });
                     for (const entry of entries) {
                         const fullPath = path.join(dir, entry.name);
-                        const relativePath = path.relative(BASE_DIR, fullPath);
+                        const relativePath = path.relative(baseDir, fullPath);
 
                         if (entry.name.startsWith(".")) continue;
                         if (ig.ignores(relativePath)) continue;
 
                         if (entry.isDirectory()) {
-                            await collectRecentFiles(fullPath, depth + 1);
+                            await collectRecentFiles(baseDir, fullPath, ig, depth + 1);
                         } else if (isMarkdownFile(entry.name)) {
                             try {
                                 const stats = await fs.stat(fullPath);
-                                recentFiles.push({ path: relativePath, mtime: stats.mtime });
+                                recentFiles.push({ path: `[${path.basename(baseDir)}] ${relativePath}`, mtime: stats.mtime });
                             } catch {
                                 // 파일 stat 실패 시 무시
                             }
@@ -1269,27 +1277,30 @@ server.resource(
                 }
             }
 
-            await collectRecentFiles(BASE_DIR, 0);
+            for (const baseDir of BASE_DIRS) {
+                const ig = await loadGitignore(baseDir);
+                await collectRecentFiles(baseDir, baseDir, ig, 0);
+            }
             recentFiles.sort((a, b) => b.mtime.getTime() - a.mtime.getTime());
             const topRecentFiles = recentFiles.slice(0, 10).map(f => f.path);
 
             // 3. 인기 태그 (최대 15개)
             const tagCounts = new Map<string, number>();
 
-            async function collectTags(dir: string, depth: number): Promise<void> {
+            async function collectTags(baseDir: string, dir: string, ig: Ignore, depth: number): Promise<void> {
                 if (depth > 5 || tagCounts.size >= 100) return;
 
                 try {
                     const entries = await fs.readdir(dir, { withFileTypes: true });
                     for (const entry of entries) {
                         const fullPath = path.join(dir, entry.name);
-                        const relativePath = path.relative(BASE_DIR, fullPath);
+                        const relativePath = path.relative(baseDir, fullPath);
 
                         if (entry.name.startsWith(".")) continue;
                         if (ig.ignores(relativePath)) continue;
 
                         if (entry.isDirectory()) {
-                            await collectTags(fullPath, depth + 1);
+                            await collectTags(baseDir, fullPath, ig, depth + 1);
                         } else if (isMarkdownFile(entry.name)) {
                             try {
                                 const fileHandle = await fs.open(fullPath, "r");
@@ -1315,7 +1326,10 @@ server.resource(
                 }
             }
 
-            await collectTags(BASE_DIR, 0);
+            for (const baseDir of BASE_DIRS) {
+                const ig = await loadGitignore(baseDir);
+                await collectTags(baseDir, baseDir, ig, 0);
+            }
             const topTags = Array.from(tagCounts.entries())
                 .sort((a, b) => b[1] - a[1])
                 .slice(0, 15)
@@ -1333,7 +1347,7 @@ server.resource(
                     uri: uri.href,
                     mimeType: "application/json",
                     text: JSON.stringify({
-                        baseDir: BASE_DIR,
+                        baseDirs: BASE_DIRS,
                         structure: {
                             folders: topLevelDirs.slice(0, 20),
                             rootFiles: topLevelFiles.slice(0, 10),
@@ -1378,7 +1392,7 @@ server.resource(
                         name: "markdown-explorer-mcp",
                         version: "5.0.0",
                         description: "마크다운 전용 파일 탐색 MCP 서버",
-                        baseDir: BASE_DIR,
+                        baseDirs: BASE_DIRS,
                         features: [
                             "통합 검색 (smart_search) - 파일명/태그/내용 동시 검색",
                             "검색 후 바로 읽기 (query 파라미터)",
@@ -1419,7 +1433,7 @@ server.resource(
 async function main() {
     const transport = new StdioServerTransport();
     await server.connect(transport);
-    console.error(`Markdown Explorer MCP 서버 v5.0.0 시작 (BASE_DIR: ${BASE_DIR})`);
+    console.error(`Markdown Explorer MCP 서버 v5.0.0 시작 (BASE_DIRS: ${BASE_DIRS.join(", ")})`);
 }
 
 main().catch((error) => {

@@ -137,6 +137,24 @@ function notMarkdownError(normalizedPath: string) {
 }
 
 /**
+ * LLM이 여러 JSON 객체를 연결하여 보낸 경우 첫 번째 query만 추출.
+ * 예: '{"query":"A"}{"query":"B"}' → 'A'
+ * 정상 입력은 그대로 반환.
+ */
+function sanitizeQuery(input: string): string {
+    const trimmed = input.trim();
+    // 패턴: {"query":"..."}...{ 형태 감지
+    if (trimmed.includes('"}') && trimmed.includes('{"')) {
+        const multiJsonPattern = /^\s*\{[^}]*"query"\s*:\s*"([^"]+)"[^}]*\}/;
+        const match = trimmed.match(multiJsonPattern);
+        if (match) {
+            return match[1];
+        }
+    }
+    return trimmed;
+}
+
+/**
  * .gitignore 파일들을 읽어서 ignore 인스턴스 생성
  */
 async function loadGitignore(directory: string): Promise<Ignore> {
@@ -312,7 +330,7 @@ server.tool(
 
 server.tool(
     "search_markdown",
-    "Unified search for markdown files. Searches filename, tags, AND content in ONE call. Supports optional filters for tags and filename patterns. Example: {\"query\":\"project\"} or {\"query\":\"회의\", \"tag\":\"work\"}.",
+    "Unified search for markdown files. Searches filename, tags, AND content in ONE call. IMPORTANT: Provide exactly ONE query string per call. For multiple searches, call this tool multiple times. Example: {\"query\":\"project\"} or {\"query\":\"회의\", \"tag\":\"work\"}.",
     {
         query: z.string().describe("Search query - searches filename, frontmatter tags, and file content simultaneously."),
         tag: z.string().optional().describe("Filter by tag in frontmatter (substring match, case-insensitive)."),
@@ -337,7 +355,8 @@ server.tool(
                 return createErrorResponse("query must be a non-empty string.");
             }
 
-            const queryLower = query.toLowerCase();
+            const sanitizedQuery = sanitizeQuery(query);
+            const queryLower = sanitizedQuery.toLowerCase();
             const tagLower = tag?.toLowerCase();
             const ig = respectGitignore ? await loadGitignore(normalizedPath) : null;
 
@@ -827,7 +846,7 @@ server.tool(
 
 server.tool(
     "read_markdown_full",
-    "Read entire markdown file(s) and return frontmatter + body. Supports: (1) direct path, (2) multiple paths, (3) SEARCH by query to find and read files when you don't know the exact path. Example: {\"path\":\"README.md\"} or {\"query\":\"개발일지\"}.",
+    "Read entire markdown file(s) and return frontmatter + body. Supports: (1) direct path, (2) multiple paths, (3) SEARCH mode. IMPORTANT: Provide exactly ONE query string per call. Example: {\"path\":\"README.md\"} or {\"query\":\"개발일지\"}.",
     {
         path: z.string().optional().describe("Single file path. Use 'path', 'paths', or 'query'."),
         paths: z.array(z.string()).optional().describe("Array of file paths."),
@@ -850,7 +869,8 @@ server.tool(
                     return pathNotFoundError(normalizedDir);
                 }
 
-                const queryLower = query.toLowerCase();
+                const sanitizedQuery = sanitizeQuery(query);
+                const queryLower = sanitizedQuery.toLowerCase();
                 const ig = await loadGitignore(normalizedDir);
 
                 interface FileScore {

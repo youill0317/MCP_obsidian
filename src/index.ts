@@ -324,8 +324,127 @@ server.tool(
             return createErrorResponse(error instanceof Error ? error.message : String(error));
         }
     }
-);// ============================================
-// 도구 2: search_markdown (통합 검색)
+);
+
+// ============================================
+// 도구 2: list_directory
+// ============================================
+
+server.tool(
+    "list_directory",
+    "List immediate contents of a directory (one level only). Returns folders and markdown files with sizes. Use this tool to explore folder structures step by step. When you see subdirectories in the results, call this tool again on them to explore deeper. Example: {\"path\":\"papers\"} → see subfolders → {\"path\":\"papers/paper_A\"} → see files.",
+    {
+        path: z.string().optional().default(".").describe("Directory path to list. Defaults to base directory."),
+        markdownOnly: z.boolean().optional().default(true).describe("Show only markdown files and directories. Set false to see all files."),
+        showHidden: z.boolean().optional().default(false).describe("Include hidden entries (names starting with .)."),
+        respectGitignore: z.boolean().optional().default(true).describe("Apply .gitignore rules to exclude paths."),
+    },
+    async ({ path: dirPath, markdownOnly, showHidden, respectGitignore }) => {
+        try {
+            const validatedPath = normalizeAndValidatePath(dirPath);
+            if (validatedPath === null) {
+                return accessDeniedError(dirPath);
+            }
+            const normalizedPath = validatedPath;
+
+            if (!(await exists(normalizedPath))) {
+                return pathNotFoundError(normalizedPath);
+            }
+
+            const stats = await fs.stat(normalizedPath);
+            if (!stats.isDirectory()) {
+                return notDirectoryError(normalizedPath);
+            }
+
+            const ig = respectGitignore ? await loadGitignore(normalizedPath) : null;
+
+            let entries = await fs.readdir(normalizedPath, { withFileTypes: true });
+
+            if (!showHidden) {
+                entries = entries.filter((e) => !e.name.startsWith("."));
+            }
+
+            if (ig) {
+                entries = entries.filter((e) => {
+                    const relativePath = path.relative(normalizedPath, path.join(normalizedPath, e.name));
+                    return !ig.ignores(relativePath);
+                });
+            }
+
+            if (markdownOnly) {
+                entries = entries.filter((e) =>
+                    e.isDirectory() || isMarkdownFile(e.name)
+                );
+            }
+
+            // 디렉토리 먼저, 그다음 파일 (이름순 정렬)
+            entries.sort((a, b) => {
+                if (a.isDirectory() !== b.isDirectory()) {
+                    return a.isDirectory() ? -1 : 1;
+                }
+                return a.name.localeCompare(b.name);
+            });
+
+            if (entries.length === 0) {
+                const typeNote = markdownOnly ? " (markdownOnly=true)" : "";
+                return {
+                    content: [{
+                        type: "text",
+                        text: `디렉토리가 비어 있습니다${typeNote}: ${normalizedPath}`,
+                    }],
+                };
+            }
+
+            const lines: string[] = [];
+            let dirCount = 0;
+            let fileCount = 0;
+
+            for (const entry of entries) {
+                const fullPath = path.join(normalizedPath, entry.name);
+
+                if (entry.isDirectory()) {
+                    // 하위 항목 수 카운트 (1단계만)
+                    let childCount = 0;
+                    try {
+                        const children = await fs.readdir(fullPath);
+                        childCount = children.length;
+                    } catch {
+                        // 읽기 실패 시 무시
+                    }
+                    lines.push(`  [DIR] ${entry.name}/ (${childCount} items)`);
+                    dirCount++;
+                } else {
+                    try {
+                        const fileStat = await fs.stat(fullPath);
+                        lines.push(`  [FILE] ${entry.name} (${formatFileSize(fileStat.size)})`);
+                    } catch {
+                        lines.push(`  [FILE] ${entry.name}`);
+                    }
+                    fileCount++;
+                }
+            }
+
+            let header = `${normalizedPath}\n`;
+            header += `${dirCount} directories, ${fileCount} files\n`;
+
+            if (dirCount > 0) {
+                header += `\nTip: Call list_directory on any subdirectory to explore deeper.\n`;
+            }
+
+            return {
+                content: [{
+                    type: "text",
+                    text: header + "\n" + lines.join("\n"),
+                }],
+            };
+        } catch (error) {
+            return createErrorResponse(error instanceof Error ? error.message : String(error));
+        }
+    }
+);
+
+// ============================================
+// 도구 3: search_markdown (통합 검색)
 // ============================================
 
 server.tool(
@@ -546,7 +665,7 @@ server.tool(
 
 
 // ============================================
-// 도구 3: read_markdown_toc
+// 도구 4: read_markdown_toc
 // ============================================
 
 server.tool(
@@ -637,7 +756,7 @@ server.tool(
 );
 
 // ============================================
-// 도구 4: read_markdown_section
+// 도구 5: read_markdown_section
 // ============================================
 
 server.tool(
@@ -841,7 +960,7 @@ server.tool(
 );
 
 // ============================================
-// 도구 5: read_markdown_full
+// 도구 6: read_markdown_full
 // ============================================
 
 server.tool(
@@ -1004,7 +1123,7 @@ server.tool(
 );
 
 // ============================================
-// 도구 6: get_linked_files
+// 도구 7: get_linked_files
 // ============================================
 
 server.tool(

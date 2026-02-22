@@ -2,7 +2,7 @@
 
 마크다운 파일 탐색 및 분석을 위한 MCP (Model Context Protocol) 서버입니다.
 
-**버전**: 4.0.0
+**버전**: 5.0.0
 
 ## 설치
 
@@ -39,16 +39,15 @@ npm start
 }
 ```
 
-## 제공 도구 (8개)
+## 제공 도구 (7개)
 
 ### 탐색 및 검색
 
 | 도구명 | 설명 | 주요 파라미터 |
 |--------|------|---------------|
-| `list_directory` | 디렉토리 내용 조회 | `path` |
 | `get_directory_tree` | 트리 구조로 표시 | `path`, `markdownOnly`, `depth` |
-| `search_markdown_files` | 마크다운 파일 검색 (태그/속성 필터) | `directory`, `pattern`, `tag`, `property`, `value` |
-| `search_text_in_markdown` | 마크다운 내 텍스트 검색 | `directory`, `query`, `contextBefore`, `contextAfter` |
+| `list_directory` | 디렉토리 내용 조회 | `path` |
+| `search_markdown` | 통합 검색 (파일명/태그/내용) | `query`, `tag`, `filenamePattern`, `directory` |
 
 ### 내용 이해
 
@@ -56,7 +55,7 @@ npm start
 |--------|------|---------------|
 | `read_markdown_toc` | 목차(TOC) 추출 | `path`, `maxLevel` |
 | `read_markdown_section` | 특정 섹션만 읽기 | `path`, `header`, `includeSubsections` |
-| `read_markdown_full` | 전체 읽기 (메타데이터 포함) | `path` 또는 `paths[]` |
+| `read_markdown_full` | 전체 읽기 (메타데이터 포함) | `path` 또는 `paths[]` 또는 `query` |
 | `get_linked_files` | 링크 추출 및 존재 확인 | `path`, `type`, `checkExists` |
 
 ## 사용 예시

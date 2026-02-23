@@ -56,7 +56,7 @@ export function normalizeAndValidatePath(inputPath: string): string | null {
  */
 export function createErrorResponse(message: string) {
     return {
-        content: [{ type: "text" as const, text: `오류: ${message}` }],
+        content: [{ type: "text" as const, text: `Error: ${message}` }],
         isError: true,
     };
 }
@@ -67,20 +67,20 @@ export function createErrorResponse(message: string) {
 export function accessDeniedError(inputPath: string) {
     const allowedDirs = BASE_DIRS.join(", ");
     return createErrorResponse(
-        `접근이 거부되었습니다: "${inputPath}"는 허용된 디렉토리(${allowedDirs}) 외부에 있습니다.`
+        `Access denied: "${inputPath}" is outside the allowed directories (${allowedDirs}).`
     );
 }
 
 export function pathNotFoundError(normalizedPath: string) {
-    return createErrorResponse(`경로가 존재하지 않습니다: ${normalizedPath}`);
+    return createErrorResponse(`Path not found: ${normalizedPath}`);
 }
 
 export function notDirectoryError(normalizedPath: string) {
-    return createErrorResponse(`디렉토리가 아닙니다: ${normalizedPath}`);
+    return createErrorResponse(`Not a directory: ${normalizedPath}`);
 }
 
 export function notMarkdownError(normalizedPath: string) {
-    return createErrorResponse(`마크다운 파일이 아닙니다: ${normalizedPath}`);
+    return createErrorResponse(`Not a markdown file: ${normalizedPath}`);
 }
 
 // ============================================
@@ -215,7 +215,7 @@ export async function loadGitignore(directory: string): Promise<Ignore> {
             const content = await fs.readFile(gitignorePath, "utf8");
             ig.add(content);
         } catch (e) {
-            logger.debug(`gitignore 읽기 실패: ${gitignorePath}`, e);
+            logger.debug(`Failed to read .gitignore: ${gitignorePath}`, e);
         }
     }
 

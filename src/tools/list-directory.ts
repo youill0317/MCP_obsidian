@@ -12,7 +12,7 @@ import {
 export function registerListDirectory(server: McpServer) {
     server.tool(
         "list_directory",
-        "List immediate contents of a directory (one level only). Returns folders and markdown files with sizes. Use this tool to explore folder structures step by step. When you see subdirectories in the results, call this tool again on them to explore deeper. Example: {\"path\":\"papers\"} → see subfolders → {\"path\":\"papers/paper_A\"} → see files.",
+        "List immediate contents of a directory (one level only). Returns folders and markdown files with sizes. Use this tool to explore folder structures step by step. When you see subdirectories in the results, call this tool again on them to explore deeper. Example: {\"path\":\"papers\"} then {\"path\":\"papers/paper_A\"}.",
         {
             path: z.string().optional().default(".").describe("Directory path to list. Defaults to base directory."),
             markdownOnly: z.boolean().optional().default(true).describe("Show only markdown files and directories. Set false to see all files."),
@@ -69,7 +69,7 @@ export function registerListDirectory(server: McpServer) {
                     return {
                         content: [{
                             type: "text",
-                            text: `디렉토리가 비어 있습니다${typeNote}: ${normalizedPath}`,
+                            text: `Directory is empty${typeNote}: ${normalizedPath}`,
                         }],
                     };
                 }
@@ -87,7 +87,7 @@ export function registerListDirectory(server: McpServer) {
                             const children = await fs.readdir(fullPath);
                             childCount = children.length;
                         } catch (e) {
-                            logger.debug(`디렉토리 읽기 실패: ${fullPath}`, e);
+                            logger.debug(`Failed to read directory: ${fullPath}`, e);
                         }
                         lines.push(`  [DIR] ${entry.name}/ (${childCount} items)`);
                         dirCount++;

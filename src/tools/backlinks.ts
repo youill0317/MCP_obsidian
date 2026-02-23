@@ -5,8 +5,13 @@ import * as path from "path";
 import { MARKDOWN_EXTENSIONS, MAX_RESULTS } from "../config.js";
 import { logger } from "../logger.js";
 import {
-    normalizeAndValidatePath, accessDeniedError, createErrorResponse,
-    pathNotFoundError, exists, isMarkdownFile, loadGitignore,
+    normalizeAndValidatePath,
+    accessDeniedError,
+    createErrorResponse,
+    pathNotFoundError,
+    exists,
+    isMarkdownFile,
+    loadGitignore,
 } from "../utils.js";
 
 type BacklinkReferenceType = "wiki-link" | "markdown-link" | "embed";
@@ -65,7 +70,7 @@ function resolveLinkCandidates(sourceFilePath: string, rawTarget: string): strin
         return [];
     }
 
-    if ((target.startsWith('"') && target.endsWith('"')) || (target.startsWith("'") && target.endsWith("'"))) {
+    if ((target.startsWith("\"") && target.endsWith("\"")) || (target.startsWith("'") && target.endsWith("'"))) {
         target = target.slice(1, -1).trim();
     }
 
@@ -137,7 +142,7 @@ function extractLinksFromLine(line: string): ParsedLink[] {
 export function registerBacklinks(server: McpServer) {
     server.tool(
         "get_backlinks",
-        "Find all markdown files that link to a specific file (backlinks / reverse link search). Searches for markdown links, wiki links, and embeds. Example: {\"path\":\"notes/project.md\"}.",
+        "Find all markdown files that link to a specific file (backlinks / reverse link search). Searches markdown links, wiki links, and embeds. Example: {\"path\":\"notes/project.md\"}.",
         {
             path: z.string().describe("Target file path to find backlinks for."),
             directory: z.string().optional().default(".").describe("Root directory to search for backlinks. Defaults to base directory."),
@@ -150,7 +155,7 @@ export function registerBacklinks(server: McpServer) {
                 if (validatedTargetPath === null) {
                     return accessDeniedError(targetPath);
                 }
-                const targetFilePath = validatedTargetPath; // 타입 좁히기 (클로저용)
+                const targetFilePath = validatedTargetPath;
 
                 if (!(await exists(targetFilePath))) {
                     return pathNotFoundError(targetFilePath);
@@ -167,7 +172,6 @@ export function registerBacklinks(server: McpServer) {
                 }
 
                 const clampedMax = Math.min(Math.max(1, maxResults), MAX_RESULTS);
-
                 const targetBaseName = path.basename(targetFilePath);
                 const targetComparablePath = normalizeForComparison(path.resolve(targetFilePath));
 
@@ -225,8 +229,8 @@ export function registerBacklinks(server: McpServer) {
                         if (references.length > 0) {
                             results.push({ sourceFile: filePath, references });
                         }
-                    } catch (e) {
-                        logger.debug(`backlinks: 파일 읽기 실패: ${filePath}`, e);
+                    } catch (error) {
+                        logger.debug(`backlinks: failed to read file: ${filePath}`, error);
                     }
                 }
 
@@ -251,18 +255,17 @@ export function registerBacklinks(server: McpServer) {
                             }
                         }
 
-                        // 병렬 처리
                         const BATCH_SIZE = 10;
                         for (let i = 0; i < fileEntries.length; i += BATCH_SIZE) {
                             const batch = fileEntries.slice(i, i + BATCH_SIZE);
-                            await Promise.allSettled(batch.map(f => checkFileForBacklinks(f)));
+                            await Promise.allSettled(batch.map((filePath) => checkFileForBacklinks(filePath)));
                         }
 
                         for (const dirPath of dirEntries) {
                             await walkForBacklinks(dirPath);
                         }
-                    } catch (e) {
-                        logger.debug(`backlinks: 디렉토리 접근 실패: ${dir}`, e);
+                    } catch (error) {
+                        logger.debug(`backlinks: failed to read directory: ${dir}`, error);
                     }
                 }
 
@@ -272,18 +275,18 @@ export function registerBacklinks(server: McpServer) {
                     return {
                         content: [{
                             type: "text",
-                            text: `"${targetBaseName}"를 참조하는 파일이 없습니다.\n\n이 파일을 링크하고 있는 다른 마크다운 파일이 없습니다.`,
+                            text: `No backlinks found for "${targetBaseName}".\n\nNo markdown files in the search scope reference this file.`,
                         }],
                     };
                 }
 
                 const topResults = results.slice(0, clampedMax);
-                let output = `"${targetBaseName}" 역링크 (${topResults.length}개 파일에서 참조):\n\n`;
+                let output = `Backlinks for "${targetBaseName}" (${topResults.length} files):\n\n`;
 
                 for (const result of topResults) {
-                    output += `📄 ${result.sourceFile}\n`;
-                    for (const ref of result.references) {
-                        output += `  L${ref.line} [${ref.type}]: ${ref.text}\n`;
+                    output += `- ${result.sourceFile}\n`;
+                    for (const reference of result.references) {
+                        output += `  L${reference.line} [${reference.type}]: ${reference.text}\n`;
                     }
                     output += "\n";
                 }

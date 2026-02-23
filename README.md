@@ -1,109 +1,121 @@
 # Markdown Explorer MCP Server
 
-마크다운 파일 탐색 및 분석을 위한 MCP (Model Context Protocol) 서버입니다.
+MCP (Model Context Protocol) server for exploring and analyzing markdown files.
 
-**버전**: 5.0.0
+**Version**: 5.0.0
 
-## 설치
+## Install
 
 ```bash
 npm install
 ```
 
-## 빌드
+## Build
 
 ```bash
 npm run build
 ```
 
-## 실행
+## Run
 
 ```bash
 npm start
 ```
 
-## 클라이언트 설정
+## Client Configuration
 
 ### Claude Desktop
 
-`claude_desktop_config.json`에 추가:
+Add this server to `claude_desktop_config.json`:
 
 ```json
 {
   "mcpServers": {
     "markdown-explorer": {
       "command": "node",
-      "args": ["c:\\Users\\user\\Documents\\Projects_src\\My_mcp\\dist\\index.js"]
+      "args": [
+        "C:\\Users\\user\\Documents\\Projects_src\\MCP\\MCP_Obsidian\\dist\\index.js"
+      ]
     }
   }
 }
 ```
 
-## 제공 도구 (7개)
+## Tools (8)
 
-### 탐색 및 검색
+### Discovery and Navigation
 
-| 도구명 | 설명 | 주요 파라미터 |
-|--------|------|---------------|
-| `get_directory_tree` | 트리 구조로 표시 | `path`, `markdownOnly`, `depth` |
-| `list_directory` | 디렉토리 내용 조회 | `path` |
-| `search_markdown` | 통합 검색 (파일명/태그/내용) | `query`, `tag`, `filenamePattern`, `directory` |
+| Tool | Description | Main Parameters |
+|------|-------------|-----------------|
+| `get_directory_tree` | Show folder structure as a tree | `path`, `depth`, `markdownOnly`, `showHidden`, `respectGitignore` |
+| `list_directory` | List one directory level | `path`, `markdownOnly`, `showHidden`, `respectGitignore` |
+| `search_markdown` | Unified search across filename, tags, and content | `query`, `tag`, `filenamePattern`, `directory`, `useRegex`, `fuzzy`, `frontmatterFilter` |
 
-### 내용 이해
+### Reading and Link Analysis
 
-| 도구명 | 설명 | 주요 파라미터 |
-|--------|------|---------------|
-| `read_markdown_toc` | 목차(TOC) 추출 | `path`, `maxLevel` |
-| `read_markdown_section` | 특정 섹션만 읽기 | `path`, `header`, `includeSubsections` |
-| `read_markdown_full` | 전체 읽기 (메타데이터 포함) | `path` 또는 `paths[]` 또는 `query` |
-| `get_linked_files` | 링크 추출 및 존재 확인 | `path`, `type`, `checkExists` |
+| Tool | Description | Main Parameters |
+|------|-------------|-----------------|
+| `read_markdown_toc` | Extract markdown table of contents from headers | `path`, `maxLevel` |
+| `read_markdown_section` | Read one section under a header | `path`, `header`, `includeSubsections` |
+| `read_markdown_full` | Read full markdown (frontmatter + body) | `path` or `paths[]` |
+| `get_linked_files` | Extract markdown/image/external/embed links | `path`, `type`, `checkExists` |
+| `get_backlinks` | Find files that link to a target file | `path`, `directory`, `maxResults`, `respectGitignore` |
 
-## 사용 예시
+## Resources (2)
 
-### 마크다운 파일만 트리로 보기
-```
-get_directory_tree로 노트 폴더를 마크다운 파일만 보여줘
-```
+| Resource | URI | Description |
+|----------|-----|-------------|
+| `vault-context` | `mcp://markdown-explorer-mcp/vault-context` | Vault summary (structure, recent files, tags, stats, tips) |
+| `server-info` | `mcp://markdown-explorer-mcp/info` | Server metadata (version, tools, resources, capabilities) |
 
-### 태그로 파일 검색
-```
-search_markdown_files로 tags에 "project"가 있는 파일 찾아줘
-```
+## Usage Examples
 
-### 목차 확인 후 섹션 읽기
-```
-read_markdown_toc로 README.md 구조를 보여줘
-read_markdown_section으로 "설치" 섹션만 읽어줘
+### Explore vault structure
+
+```text
+get_directory_tree with {"path": ".", "depth": 2}
 ```
 
-### 여러 파일 한 번에 읽기
-```
-read_markdown_full로 note1.md, note2.md, note3.md를 읽어줘
-```
+### Find notes with one query
 
-### 링크된 파일 존재 확인
-```
-get_linked_files로 이 문서의 링크들이 실제로 존재하는지 확인해줘
+```text
+search_markdown with {"query": "project", "tag": "work"}
 ```
 
-## 주요 기능
+### Read section by header
 
-- **프론트매터 지원**: YAML 메타데이터 파싱 및 태그 검색
-- **목차 추출**: 헤더 기반 문서 구조 파악
-- **섹션별 읽기**: 토큰 절약을 위한 부분 읽기
-- **링크 분석**: 위키 링크, 이미지, 임베드 추출 및 존재 확인
-- **복수 파일 읽기**: 연관 문서 일괄 조회
-- **gitignore 존중**: 불필요한 파일 자동 제외
+```text
+read_markdown_section with {"path": "README.md", "header": "Install"}
+```
 
-## 지원 마크다운 확장자
+### Read multiple files in one call
+
+```text
+read_markdown_full with {"paths": ["note1.md", "note2.md"]}
+```
+
+### Inspect links in a note
+
+```text
+get_linked_files with {"path": "README.md", "checkExists": true}
+```
+
+### Recommended workflow
+
+```text
+1) search_markdown -> discover file paths
+2) read_markdown_full/read_markdown_section -> read specific files by path
+```
+
+## Supported Markdown Extensions
 
 - `.md`
 - `.mdx`
 - `.markdown`
 
-## 개발
+## Development
 
 ```bash
-# 개발 모드 (파일 변경 시 자동 빌드)
+# Watch mode
 npm run dev
 ```

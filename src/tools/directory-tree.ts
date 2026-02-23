@@ -91,7 +91,7 @@ export function registerDirectoryTree(server: McpServer) {
                             }
                         }
                     } catch (e) {
-                        logger.debug(`디렉토리 접근 실패: ${dir}`, e);
+                        logger.debug(`Failed to access directory: ${dir}`, e);
                     }
                 }
 

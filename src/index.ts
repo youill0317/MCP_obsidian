@@ -4,7 +4,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { BASE_DIRS } from "./config.js";
 
-// 도구 등록
+// Tool registrations
 import { registerDirectoryTree } from "./tools/directory-tree.js";
 import { registerListDirectory } from "./tools/list-directory.js";
 import { registerSearchMarkdown } from "./tools/search-markdown.js";
@@ -14,17 +14,17 @@ import { registerReadFull } from "./tools/read-full.js";
 import { registerLinkedFiles } from "./tools/linked-files.js";
 import { registerBacklinks } from "./tools/backlinks.js";
 
-// 리소스 등록
+// Resource registrations
 import { registerVaultContext } from "./resources/vault-context.js";
 import { registerServerInfo } from "./resources/server-info.js";
 
-// MCP 서버 인스턴스 생성
+// MCP server instance
 const server = new McpServer({
     name: "markdown-explorer-mcp",
     version: "5.0.0",
 });
 
-// 도구 등록
+// Register tools
 registerDirectoryTree(server);
 registerListDirectory(server);
 registerSearchMarkdown(server);
@@ -34,18 +34,18 @@ registerReadFull(server);
 registerLinkedFiles(server);
 registerBacklinks(server);
 
-// 리소스 등록
+// Register resources
 registerVaultContext(server);
 registerServerInfo(server);
 
-// 서버 시작
+// Start server
 async function main() {
     const transport = new StdioServerTransport();
     await server.connect(transport);
-    console.error(`Markdown Explorer MCP 서버 v5.0.0 시작 (BASE_DIRS: ${BASE_DIRS.join(", ")})`);
+    console.error(`Markdown Explorer MCP server v5.0.0 started (BASE_DIRS: ${BASE_DIRS.join(", ")})`);
 }
 
 main().catch((error) => {
-    console.error("서버 시작 실패:", error);
+    console.error("Failed to start server:", error);
     process.exit(1);
 });

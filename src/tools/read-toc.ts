@@ -71,7 +71,7 @@ export function registerReadToc(server: McpServer) {
 
                 if (toc.length === 0) {
                     return {
-                        content: [{ type: "text", text: "헤더를 찾을 수 없습니다." }],
+                        content: [{ type: "text", text: "No headers found." }],
                     };
                 }
 
@@ -84,7 +84,7 @@ export function registerReadToc(server: McpServer) {
                 return {
                     content: [{
                         type: "text",
-                        text: `목차 (${toc.length}개 헤더):\n\n${output}`,
+                        text: `Table of contents (${toc.length} headers):\n\n${output}`,
                     }],
                 };
             } catch (error) {

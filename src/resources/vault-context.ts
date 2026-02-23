@@ -12,7 +12,7 @@ export function registerVaultContext(server: McpServer) {
         "mcp://markdown-explorer-mcp/vault-context",
         async (uri) => {
             try {
-                // 1. 최상위 폴더 구조 (모든 BASE_DIRS에서 수집)
+                // 1) Top-level structure across all base dirs
                 const topLevelDirs: string[] = [];
                 const topLevelFiles: string[] = [];
 
@@ -30,12 +30,12 @@ export function registerVaultContext(server: McpServer) {
                                 topLevelFiles.push(`[${path.basename(baseDir)}] ${entry.name}`);
                             }
                         }
-                    } catch (e) {
-                        logger.debug(`vault-context: 디렉토리 읽기 실패: ${baseDir}`, e);
+                    } catch (error) {
+                        logger.debug(`vault-context: failed to read directory: ${baseDir}`, error);
                     }
                 }
 
-                // 2. 최근 수정된 파일 (최대 10개)
+                // 2) Recently modified markdown files (top 10)
                 interface FileInfo {
                     path: string;
                     mtime: Date;
@@ -60,13 +60,13 @@ export function registerVaultContext(server: McpServer) {
                                 try {
                                     const stats = await fs.stat(fullPath);
                                     recentFiles.push({ path: `[${path.basename(baseDir)}] ${relativePath}`, mtime: stats.mtime });
-                                } catch (e) {
-                                    logger.debug(`vault-context: 파일 stat 실패: ${fullPath}`, e);
+                                } catch (error) {
+                                    logger.debug(`vault-context: failed to stat file: ${fullPath}`, error);
                                 }
                             }
                         }
-                    } catch (e) {
-                        logger.debug(`vault-context: 디렉토리 순회 실패: ${dir}`, e);
+                    } catch (error) {
+                        logger.debug(`vault-context: failed to walk directory: ${dir}`, error);
                     }
                 }
 
@@ -75,9 +75,9 @@ export function registerVaultContext(server: McpServer) {
                     await collectRecentFiles(baseDir, baseDir, ig, 0);
                 }
                 recentFiles.sort((a, b) => b.mtime.getTime() - a.mtime.getTime());
-                const topRecentFiles = recentFiles.slice(0, 10).map(f => f.path);
+                const topRecentFiles = recentFiles.slice(0, 10).map((item) => item.path);
 
-                // 3. 인기 태그 (최대 15개)
+                // 3) Popular tags from frontmatter
                 const tagCounts = new Map<string, number>();
 
                 async function collectTags(baseDir: string, dir: string, ig: Ignore, depth: number): Promise<void> {
@@ -109,13 +109,13 @@ export function registerVaultContext(server: McpServer) {
                                             tagCounts.set(tagStr, (tagCounts.get(tagStr) || 0) + 1);
                                         }
                                     }
-                                } catch (e) {
-                                    logger.debug(`vault-context: 파일 읽기 실패: ${fullPath}`, e);
+                                } catch (error) {
+                                    logger.debug(`vault-context: failed to read file: ${fullPath}`, error);
                                 }
                             }
                         }
-                    } catch (e) {
-                        logger.debug(`vault-context: 디렉토리 순회 실패: ${dir}`, e);
+                    } catch (error) {
+                        logger.debug(`vault-context: failed to walk directory: ${dir}`, error);
                     }
                 }
 
@@ -123,12 +123,13 @@ export function registerVaultContext(server: McpServer) {
                     const ig = await loadGitignore(baseDir);
                     await collectTags(baseDir, baseDir, ig, 0);
                 }
+
                 const topTags = Array.from(tagCounts.entries())
                     .sort((a, b) => b[1] - a[1])
                     .slice(0, 15)
                     .map(([tag, count]) => ({ tag, count }));
 
-                // 4. 통계
+                // 4) Summary stats
                 const stats = {
                     totalFolders: topLevelDirs.length,
                     totalRecentFiles: recentFiles.length,
@@ -149,9 +150,8 @@ export function registerVaultContext(server: McpServer) {
                             topTags,
                             stats,
                             tips: [
-                                "search_markdown: 파일명/태그/내용을 한 번에 검색",
-                                "read_markdown_full(query='...'): 검색 후 바로 읽기",
-                                "read_markdown_section(header='...'): 전체에서 헤더 검색",
+                                "Use search_markdown for unified discovery across filename, tags, and content.",
+                                "Recommended flow: search_markdown -> read_markdown_full/read_markdown_section with explicit paths.",
                             ],
                         }, null, 2),
                     }],

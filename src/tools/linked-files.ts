@@ -3,8 +3,13 @@ import { z } from "zod";
 import * as fs from "fs/promises";
 import * as path from "path";
 import {
-    normalizeAndValidatePath, accessDeniedError, createErrorResponse,
-    pathNotFoundError, notMarkdownError, exists, isMarkdownFile,
+    normalizeAndValidatePath,
+    accessDeniedError,
+    createErrorResponse,
+    pathNotFoundError,
+    notMarkdownError,
+    exists,
+    isMarkdownFile,
 } from "../utils.js";
 
 export function registerLinkedFiles(server: McpServer) {
@@ -58,16 +63,16 @@ export function registerLinkedFiles(server: McpServer) {
 
                 async function checkLinkTargetExists(linkInfo: LinkInfo, unresolvedPath: string): Promise<void> {
                     const resolvedPath = path.resolve(fileDir, unresolvedPath);
-                    const validatedPath = normalizeAndValidatePath(resolvedPath);
+                    const validated = normalizeAndValidatePath(resolvedPath);
 
-                    if (validatedPath === null) {
+                    if (validated === null) {
                         linkInfo.outsideBaseDir = true;
                         linkInfo.exists = false;
                         return;
                     }
 
-                    linkInfo.resolvedPath = validatedPath;
-                    linkInfo.exists = await exists(validatedPath);
+                    linkInfo.resolvedPath = validated;
+                    linkInfo.exists = await exists(validated);
                 }
 
                 for (let i = 0; i < lines.length; i++) {
@@ -82,7 +87,6 @@ export function registerLinkedFiles(server: McpServer) {
 
                     let match;
 
-                    // 일반 마크다운 링크
                     while ((match = markdownLinkRegex.exec(line)) !== null) {
                         const target = match[2];
                         const isExternal = /^https?:\/\//.test(target);
@@ -110,7 +114,6 @@ export function registerLinkedFiles(server: McpServer) {
                         }
                     }
 
-                    // 위키 링크
                     while ((match = wikiLinkRegex.exec(line)) !== null) {
                         if (type === "all" || type === "markdown") {
                             const target = match[1];
@@ -130,7 +133,6 @@ export function registerLinkedFiles(server: McpServer) {
                         }
                     }
 
-                    // 임베드
                     while ((match = embedRegex.exec(line)) !== null) {
                         if (type === "all" || type === "embed") {
                             const target = match[1];
@@ -148,7 +150,6 @@ export function registerLinkedFiles(server: McpServer) {
                         }
                     }
 
-                    // 이미지
                     while ((match = imageRegex.exec(line)) !== null) {
                         const target = match[2];
                         const isExternal = /^https?:\/\//.test(target);
@@ -180,52 +181,53 @@ export function registerLinkedFiles(server: McpServer) {
                         content: [{
                             type: "text",
                             text: type === "all"
-                                ? "링크를 찾을 수 없습니다."
-                                : `"${type}" 타입의 링크를 찾을 수 없습니다.`,
+                                ? "No links found."
+                                : `No "${type}" links found.`,
                         }],
                     };
                 }
 
-                // 타입별로 그룹화
                 const grouped = {
-                    markdown: links.filter(l => l.type === "markdown"),
-                    image: links.filter(l => l.type === "image"),
-                    external: links.filter(l => l.type === "external"),
-                    embed: links.filter(l => l.type === "embed"),
+                    markdown: links.filter((link) => link.type === "markdown"),
+                    image: links.filter((link) => link.type === "image"),
+                    external: links.filter((link) => link.type === "external"),
+                    embed: links.filter((link) => link.type === "embed"),
                 };
 
-                let output = `링크 (${links.length}개 발견):\n\n`;
+                let output = `Links (${links.length} found):\n\n`;
 
-                const formatLink = (l: LinkInfo) => {
+                const formatLink = (link: LinkInfo) => {
                     const status = checkExists
-                        ? (l.outsideBaseDir ? "[OUTSIDE]" : (l.exists ? "[O]" : "[X]"))
-                        : "•";
-                    const displayTarget = l.type === "markdown" && !l.target.includes("/") ? `[[${l.target}]]` : l.target;
-                    const reason = l.outsideBaseDir ? " (BASE_DIR 외부)" : "";
-                    return `  ${status} L${l.line}: ${displayTarget}${l.text ? ` (${l.text})` : ""}${reason}`;
+                        ? (link.outsideBaseDir ? "[OUTSIDE]" : (link.exists ? "[OK]" : "[MISSING]"))
+                        : "-";
+                    const displayTarget = link.type === "markdown" && !link.target.includes("/")
+                        ? `[[${link.target}]]`
+                        : link.target;
+                    const reason = link.outsideBaseDir ? " (outside BASE_DIRS)" : "";
+                    return `  ${status} L${link.line}: ${displayTarget}${link.text ? ` (${link.text})` : ""}${reason}`;
                 };
 
                 if (grouped.markdown.length > 0) {
-                    output += `[마크다운] (${grouped.markdown.length}개):\n`;
-                    grouped.markdown.forEach(l => output += formatLink(l) + "\n");
+                    output += `[Markdown] (${grouped.markdown.length}):\n`;
+                    grouped.markdown.forEach((link) => { output += formatLink(link) + "\n"; });
                     output += "\n";
                 }
 
                 if (grouped.image.length > 0) {
-                    output += `[이미지] (${grouped.image.length}개):\n`;
-                    grouped.image.forEach(l => output += formatLink(l) + "\n");
+                    output += `[Image] (${grouped.image.length}):\n`;
+                    grouped.image.forEach((link) => { output += formatLink(link) + "\n"; });
                     output += "\n";
                 }
 
                 if (grouped.external.length > 0) {
-                    output += `[외부] (${grouped.external.length}개):\n`;
-                    grouped.external.forEach(l => output += formatLink(l) + "\n");
+                    output += `[External] (${grouped.external.length}):\n`;
+                    grouped.external.forEach((link) => { output += formatLink(link) + "\n"; });
                     output += "\n";
                 }
 
                 if (grouped.embed.length > 0) {
-                    output += `[임베드] (${grouped.embed.length}개):\n`;
-                    grouped.embed.forEach(l => output += formatLink(l) + "\n");
+                    output += `[Embed] (${grouped.embed.length}):\n`;
+                    grouped.embed.forEach((link) => { output += formatLink(link) + "\n"; });
                 }
 
                 return {

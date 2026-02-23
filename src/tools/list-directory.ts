@@ -12,12 +12,32 @@ import {
 export function registerListDirectory(server: McpServer) {
     server.tool(
         "list_directory",
-        "List immediate contents of a directory (one level only). Returns folders and markdown files with sizes. Use this tool to explore folder structures step by step. When you see subdirectories in the results, call this tool again on them to explore deeper. Example: {\"path\":\"papers\"} then {\"path\":\"papers/paper_A\"}.",
+        `Navigation tool for one-level directory listing.
+
+Use when:
+- You want controlled, step-by-step exploration.
+- You need immediate child folders/files with sizes.
+
+Do not use when:
+- You need recursive tree output (use get_directory_tree).
+- You need semantic search by query/tag/content (use search_markdown).
+
+Input rules:
+- "path" should be a directory.
+- Call repeatedly on child directories to explore deeper.
+
+Good examples:
+- {"path":"notes"}
+- {"path":"notes/projectA","markdownOnly":false}
+
+Bad examples:
+- {"path":"README.md"}  // file path, not a directory
+- {"query":"project"}  // query search belongs to search_markdown`,
         {
             path: z.string().optional().default(".").describe("Directory path to list. Defaults to base directory."),
-            markdownOnly: z.boolean().optional().default(true).describe("Show only markdown files and directories. Set false to see all files."),
+            markdownOnly: z.boolean().optional().default(true).describe("If true, show only markdown files and directories."),
             showHidden: z.boolean().optional().default(false).describe("Include hidden entries (names starting with .)."),
-            respectGitignore: z.boolean().optional().default(true).describe("Apply .gitignore rules to exclude paths."),
+            respectGitignore: z.boolean().optional().default(true).describe("If true, apply .gitignore rules to exclude paths."),
         },
         async ({ path: dirPath, markdownOnly, showHidden, respectGitignore }) => {
             try {

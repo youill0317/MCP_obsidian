@@ -9,10 +9,30 @@ import {
 export function registerReadToc(server: McpServer) {
     server.tool(
         "read_markdown_toc",
-        "Extract headers (H1-H6) to build a table of contents. Ignores headers inside code blocks. Example: {\"path\":\"README.md\",\"maxLevel\":3}.",
+        `Read tool for markdown structure. Extracts headers (H1-H6) as a table of contents.
+
+Use when:
+- You need a quick structural overview before reading sections.
+
+Do not use when:
+- You need full content body (use read_markdown_full).
+- You need search/discovery across files (use search_markdown).
+
+Input rules:
+- "path" must point to one markdown file.
+- "maxLevel" must be an integer 1..6.
+- Headers inside fenced code blocks are ignored.
+
+Good examples:
+- {"path":"README.md"}
+- {"path":"docs/guide.md","maxLevel":3}
+
+Bad examples:
+- {"path":"docs"}  // directory path, not a file
+- {"path":"README.md","maxLevel":10}  // invalid level`,
         {
             path: z.string().describe("Markdown file path (must be a file)."),
-            maxLevel: z.number().optional().default(6).describe("Maximum header level to include (1-6)."),
+            maxLevel: z.number().optional().default(6).describe("Maximum header level to include (integer 1-6)."),
         },
         async ({ path: filePath, maxLevel }) => {
             try {

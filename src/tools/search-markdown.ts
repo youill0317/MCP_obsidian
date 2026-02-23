@@ -25,19 +25,42 @@ function parseOptionalDate(value: string | undefined, label: string): Date | nul
 export function registerSearchMarkdown(server: McpServer) {
     server.tool(
         "search_markdown",
-        "Unified markdown discovery tool. Searches filename, frontmatter tags, and content in one call. For multiple independent searches, call this tool multiple times.",
+        `Discovery tool for markdown files (filename + frontmatter tags + content).
+
+Use when:
+- You need to FIND candidate files.
+- You do not know exact file paths yet.
+
+Do not use when:
+- You already know the file path and need file content (use read_markdown_full).
+- You need one specific section from a known file (use read_markdown_section).
+
+Input rules:
+- Provide one clear query intent per call.
+- "useRegex" and "fuzzy" cannot both be true.
+- "modifiedAfter"/"modifiedBefore" must be ISO dates (YYYY-MM-DD recommended).
+
+Good examples:
+- {"query":"project roadmap"}
+- {"query":"architecture", "directory":"docs", "maxResults":5}
+- {"query":"release.*notes", "useRegex":true, "directory":"notes"}
+
+Bad examples:
+- {"query":"release.*", "useRegex":true, "fuzzy":true}  // invalid combination
+- {"query":""}  // empty query
+- "Find then read entire file" in one step  // use search_markdown first, then read_*`,
         {
-            query: z.string().describe("Single search query text."),
-            tag: z.string().optional().describe("Optional tag filter (substring match, case-insensitive)."),
-            filenamePattern: z.string().optional().describe("Optional filename glob pattern filter (* and ? supported)."),
-            directory: z.string().optional().default(".").describe("Search root directory. Defaults to base directory."),
-            maxResults: z.number().optional().default(10).describe(`Maximum results to return (1-${MAX_RESULTS}).`),
-            respectGitignore: z.boolean().optional().default(true).describe("Apply .gitignore rules."),
-            useRegex: z.boolean().optional().default(false).describe("Treat query as regex if true."),
-            fuzzy: z.boolean().optional().default(false).describe("Enable fuzzy matching if true. Cannot be used with useRegex."),
-            frontmatterFilter: z.record(z.string()).optional().describe("Filter by frontmatter key/value substring matches."),
-            modifiedAfter: z.string().optional().describe("Only include files modified after this ISO date."),
-            modifiedBefore: z.string().optional().describe("Only include files modified before this ISO date."),
+            query: z.string().describe("Required. Single discovery query string. Keep one intent per call."),
+            tag: z.string().optional().describe("Optional frontmatter tag filter (substring match, case-insensitive)."),
+            filenamePattern: z.string().optional().describe("Optional filename glob filter. Supports '*' and '?'."),
+            directory: z.string().optional().default(".").describe("Search root directory (must be inside BASE_DIRS)."),
+            maxResults: z.number().optional().default(10).describe(`Maximum returned results (integer, clamped to 1-${MAX_RESULTS}).`),
+            respectGitignore: z.boolean().optional().default(true).describe("If true, apply .gitignore and default ignore rules."),
+            useRegex: z.boolean().optional().default(false).describe("If true, treat query as regex. Cannot be true with fuzzy."),
+            fuzzy: z.boolean().optional().default(false).describe("If true, use fuzzy matching. Cannot be true with useRegex."),
+            frontmatterFilter: z.record(z.string()).optional().describe("Optional frontmatter key-value filters (substring, case-insensitive)."),
+            modifiedAfter: z.string().optional().describe("Optional ISO date filter. Include files modified after this date."),
+            modifiedBefore: z.string().optional().describe("Optional ISO date filter. Include files modified before this date."),
         },
         async ({
             query,

@@ -14,11 +14,32 @@ import {
 export function registerReadSection(server: McpServer) {
     server.tool(
         "read_markdown_section",
-        "Read a specific section under a markdown header in a single markdown file.",
+        `Read tool for one header section from a known markdown file.
+
+Use when:
+- You know the file path and the target header.
+- You want a focused section instead of full file content.
+
+Do not use when:
+- You do not know the file path (use search_markdown first).
+- You need the full file body (use read_markdown_full).
+
+Input rules:
+- "path" is required.
+- "header" must be non-empty (leading '#' is allowed and ignored).
+- Set "includeSubsections" to false for strict single-section extraction.
+
+Good examples:
+- {"path":"README.md","header":"Install"}
+- {"path":"docs/guide.md","header":"## API","includeSubsections":false}
+
+Bad examples:
+- {"header":"Install"}  // missing required path
+- {"path":"README.md","header":""}  // empty header`,
         {
-            path: z.string().describe("Markdown file path."),
-            header: z.string().describe("Header text to extract. Leading '#' is ignored."),
-            includeSubsections: z.boolean().optional().default(true).describe("If true, include nested subsections."),
+            path: z.string().describe("Required markdown file path (inside BASE_DIRS)."),
+            header: z.string().describe("Required target header text. Leading '#' is ignored."),
+            includeSubsections: z.boolean().optional().default(true).describe("If true, include nested subsections until same or higher header level."),
         },
         async ({ path: filePath, header, includeSubsections }) => {
             try {

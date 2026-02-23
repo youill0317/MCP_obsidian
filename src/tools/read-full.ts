@@ -17,10 +17,32 @@ import {
 export function registerReadFull(server: McpServer) {
     server.tool(
         "read_markdown_full",
-        "Read full markdown file(s) including frontmatter and body. Supports direct path(s) only.",
+        `Read tool for full markdown content (frontmatter + body) from known file path(s).
+
+Use when:
+- You already know exact file path(s).
+- You need complete file content, not just one section.
+
+Do not use when:
+- You need to discover candidate files (use search_markdown).
+- You only need one section under a specific header (use read_markdown_section).
+
+Input rules:
+- Provide either "path" OR "paths", never both.
+- "paths" supports up to ${MAX_PATHS} files.
+- Only markdown files are allowed.
+
+Good examples:
+- {"path":"README.md"}
+- {"paths":["notes/todo.md","notes/plan.md"]}
+
+Bad examples:
+- {"query":"project"}  // discovery belongs to search_markdown
+- {"path":"a.md","paths":["b.md"]}  // invalid: both provided
+- {"paths":[]}  // invalid: empty list`,
         {
-            path: z.string().optional().describe("Single markdown file path."),
-            paths: z.array(z.string()).max(MAX_PATHS).optional().describe(`Array of markdown paths (max ${MAX_PATHS}).`),
+            path: z.string().optional().describe("Single markdown file path (inside BASE_DIRS)."),
+            paths: z.array(z.string()).max(MAX_PATHS).optional().describe(`Array of markdown file paths (max ${MAX_PATHS}).`),
         },
         async ({ path: singlePath, paths: multiplePaths }) => {
             try {

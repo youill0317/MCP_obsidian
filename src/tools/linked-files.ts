@@ -15,11 +15,32 @@ import {
 export function registerLinkedFiles(server: McpServer) {
     server.tool(
         "get_linked_files",
-        "Extract links, wiki links, images, and embeds from a markdown file. Optionally check whether targets exist. Example: {\"path\":\"README.md\",\"type\":\"markdown\"}.",
+        `Link analysis tool for one markdown file. Extracts markdown links, wiki links, images, embeds, and external links.
+
+Use when:
+- You need outgoing link inventory from a known note.
+- You need optional existence checks for local targets.
+
+Do not use when:
+- You need reverse links/backlinks (use get_backlinks).
+- You need discovery by query (use search_markdown).
+
+Input rules:
+- "path" must be one markdown file.
+- "checkExists": true may be slower (per-link file checks).
+- "type" filters output by link category.
+
+Good examples:
+- {"path":"README.md"}
+- {"path":"notes/project.md","type":"markdown","checkExists":true}
+
+Bad examples:
+- {"path":"notes"}  // directory path, not a markdown file
+- {"path":"README.md","type":"pdf"}  // invalid type`,
         {
             path: z.string().describe("Markdown file path."),
-            type: z.enum(["all", "markdown", "image", "external", "embed"]).optional().default("all").describe("Filter: all | markdown | image | external | embed."),
-            checkExists: z.boolean().optional().default(false).describe("If true, verify link targets exist (relative paths are resolved from the file; slower)."),
+            type: z.enum(["all", "markdown", "image", "external", "embed"]).optional().default("all").describe("Optional type filter: all | markdown | image | external | embed."),
+            checkExists: z.boolean().optional().default(false).describe("If true, verify local link targets exist (slower)."),
         },
         async ({ path: filePath, type, checkExists }) => {
             try {

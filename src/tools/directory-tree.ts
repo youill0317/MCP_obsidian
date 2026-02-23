@@ -12,7 +12,26 @@ import {
 export function registerDirectoryTree(server: McpServer) {
     server.tool(
         "get_directory_tree",
-        "Show the directory structure as a tree (does not read file contents). For overview only, not search. Example: {\"path\":\"docs\",\"depth\":2}.",
+        `Navigation tool for recursive tree overview (folder structure only).
+
+Use when:
+- You need a high-level map of folders/files before searching.
+
+Do not use when:
+- You need one-level listing with item sizes (use list_directory).
+- You need content/tag search (use search_markdown).
+
+Input rules:
+- "path" should be a directory.
+- Keep "depth" small to avoid overly large outputs.
+
+Good examples:
+- {"path":".","depth":2}
+- {"path":"docs","depth":3,"markdownOnly":true}
+
+Bad examples:
+- {"path":"README.md","depth":2}  // file path, not a directory
+- {"query":"project"}  // query search belongs to search_markdown`,
         {
             path: z.string().optional().default(".").describe("Root directory path for the tree. Defaults to base directory if omitted."),
             depth: z.number().optional().default(3).describe("Maximum depth to display (integer >= 1). Larger values increase output size/tokens (default 3)."),

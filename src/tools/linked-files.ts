@@ -21,22 +21,12 @@ Use when:
 - You need outgoing link inventory from a known note.
 - You need optional existence checks for local targets.
 
-Do not use when:
-- You need reverse links/backlinks (use get_backlinks).
-- You need discovery by query (use search_markdown).
-
 Input rules:
 - "path" must be one markdown file.
 - "checkExists": true may be slower (per-link file checks).
 - "type" filters output by link category.
-
-Good examples:
-- {"path":"README.md"}
-- {"path":"notes/project.md","type":"markdown","checkExists":true}
-
-Bad examples:
-- {"path":"notes"}  // directory path, not a markdown file
-- {"path":"README.md","type":"pdf"}  // invalid type`,
+- Paths are relative to BASE_DIR. Do not repeat the BASE_DIR name in the path (e.g. if BASE_DIR ends with "Projects", use "subfolder/file.md" not "Projects/subfolder/file.md").
+- Send exactly one JSON object per tool call. Do not concatenate multiple JSON objects.`,
         {
             path: z.string().describe("Markdown file path."),
             type: z.enum(["all", "markdown", "image", "external", "embed"]).optional().default("all").describe("Optional type filter: all | markdown | image | external | embed."),

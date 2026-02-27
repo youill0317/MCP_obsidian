@@ -14,22 +14,12 @@ export function registerReadToc(server: McpServer) {
 Use when:
 - You need a quick structural overview before reading sections.
 
-Do not use when:
-- You need full content body (use read_markdown_full).
-- You need search/discovery across files (use search_markdown).
-
 Input rules:
 - "path" must point to one markdown file.
 - "maxLevel" must be an integer 1..6.
 - Headers inside fenced code blocks are ignored.
-
-Good examples:
-- {"path":"README.md"}
-- {"path":"docs/guide.md","maxLevel":3}
-
-Bad examples:
-- {"path":"docs"}  // directory path, not a file
-- {"path":"README.md","maxLevel":10}  // invalid level`,
+- Paths are relative to BASE_DIR. Do not repeat the BASE_DIR name in the path (e.g. if BASE_DIR ends with "Projects", use "subfolder/file.md" not "Projects/subfolder/file.md").
+- Send exactly one JSON object per tool call. Do not concatenate multiple JSON objects.`,
         {
             path: z.string().describe("Markdown file path (must be a file)."),
             maxLevel: z.number().optional().default(6).describe("Maximum header level to include (integer 1-6)."),

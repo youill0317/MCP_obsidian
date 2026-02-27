@@ -20,22 +20,12 @@ Use when:
 - You know the file path and the target header.
 - You want a focused section instead of full file content.
 
-Do not use when:
-- You do not know the file path (use search_markdown first).
-- You need the full file body (use read_markdown_full).
-
 Input rules:
 - "path" is required.
 - "header" must be non-empty (leading '#' is allowed and ignored).
 - Set "includeSubsections" to false for strict single-section extraction.
-
-Good examples:
-- {"path":"README.md","header":"Install"}
-- {"path":"docs/guide.md","header":"## API","includeSubsections":false}
-
-Bad examples:
-- {"header":"Install"}  // missing required path
-- {"path":"README.md","header":""}  // empty header`,
+- Paths are relative to BASE_DIR. Do not repeat the BASE_DIR name in the path (e.g. if BASE_DIR ends with "Projects", use "subfolder/file.md" not "Projects/subfolder/file.md").
+- Send exactly one JSON object per tool call. Do not concatenate multiple JSON objects.`,
         {
             path: z.string().describe("Required markdown file path (inside BASE_DIRS)."),
             header: z.string().describe("Required target header text. Leading '#' is ignored."),

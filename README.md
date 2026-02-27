@@ -88,6 +88,12 @@ Add this server to `claude_desktop_config.json`:
 
 ## Parameter Safety Rules (LLM-Safe)
 
+0. All tool calls (JSON envelope)
+- Send exactly one JSON object per tool call.
+- Do not concatenate objects in one payload (`{...}{...}` is invalid JSON).
+- Do not add prose, markdown fences, or trailing characters outside JSON.
+- If parsing fails with `Unexpected non-whitespace character after JSON`, retry with only one JSON object.
+
 1. `search_markdown`
 - Always provide a non-empty `query`.
 - Do not set `useRegex=true` and `fuzzy=true` together.
@@ -126,11 +132,28 @@ Good:
 {"query":"release.*notes","useRegex":true,"directory":"docs"}
 ```
 
+Good:
+```json
+{"query":"보험 시뮬레이션 노력 점수 할인 모델","directory":"Projects/DB 보험금융공모전","maxResults":10}
+```
+
 Bad:
 ```json
 {"query":"release.*","useRegex":true,"fuzzy":true}
 ```
 Reason: invalid combination (`useRegex` and `fuzzy` are mutually exclusive).
+
+Bad:
+```json
+{"query":"보험 시뮬레이션 노력 점수 할인 모델","directory":"Projects/DB 보험금융공모전","maxResults":10}{"query":"보험 시뮬레이션 노력 점수 할인 모델","directory":"Projects/DB 보험금융공모전","maxResults":10}
+```
+Reason: two JSON objects are concatenated; one call must contain exactly one JSON object.
+
+Bad:
+```json
+{"query":"project roadmap"}}
+```
+Reason: trailing non-whitespace character after the JSON object causes parser failure.
 
 ### read_markdown_full
 
@@ -223,6 +246,9 @@ Reason: `get_directory_tree` expects a directory path, not a file path.
 
 5. Too much output / token pressure
 - Fix: lower `depth`, lower `maxResults`, use section-level reads, split into multiple calls.
+
+6. `Unexpected non-whitespace character after JSON ...`
+- Fix: resend exactly one valid JSON object, with no second object and no trailing text.
 
 ## Supported Markdown Extensions
 

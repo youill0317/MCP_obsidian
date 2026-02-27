@@ -31,24 +31,12 @@ Use when:
 - You need to FIND candidate files.
 - You do not know exact file paths yet.
 
-Do not use when:
-- You already know the file path and need file content (use read_markdown_full).
-- You need one specific section from a known file (use read_markdown_section).
-
 Input rules:
 - Provide one clear query intent per call.
 - "useRegex" and "fuzzy" cannot both be true.
 - "modifiedAfter"/"modifiedBefore" must be ISO dates (YYYY-MM-DD recommended).
-
-Good examples:
-- {"query":"project roadmap"}
-- {"query":"architecture", "directory":"docs", "maxResults":5}
-- {"query":"release.*notes", "useRegex":true, "directory":"notes"}
-
-Bad examples:
-- {"query":"release.*", "useRegex":true, "fuzzy":true}  // invalid combination
-- {"query":""}  // empty query
-- "Find then read entire file" in one step  // use search_markdown first, then read_*`,
+- "directory" is relative to BASE_DIR. Do not repeat the BASE_DIR name in the path (e.g. if BASE_DIR ends with "Projects", use "subfolder" not "Projects/subfolder").
+- Send exactly one JSON object per tool call. Do not concatenate multiple JSON objects.`,
         {
             query: z.string().describe("Required. Single discovery query string. Keep one intent per call."),
             tag: z.string().optional().describe("Optional frontmatter tag filter (substring match, case-insensitive)."),

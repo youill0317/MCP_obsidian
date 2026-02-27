@@ -23,23 +23,12 @@ Use when:
 - You already know exact file path(s).
 - You need complete file content, not just one section.
 
-Do not use when:
-- You need to discover candidate files (use search_markdown).
-- You only need one section under a specific header (use read_markdown_section).
-
 Input rules:
 - Provide either "path" OR "paths", never both.
 - "paths" supports up to ${MAX_PATHS} files.
 - Only markdown files are allowed.
-
-Good examples:
-- {"path":"README.md"}
-- {"paths":["notes/todo.md","notes/plan.md"]}
-
-Bad examples:
-- {"query":"project"}  // discovery belongs to search_markdown
-- {"path":"a.md","paths":["b.md"]}  // invalid: both provided
-- {"paths":[]}  // invalid: empty list`,
+- Paths are relative to BASE_DIR. Do not repeat the BASE_DIR name in the path (e.g. if BASE_DIR ends with "Projects", use "subfolder/file.md" not "Projects/subfolder/file.md").
+- Send exactly one JSON object per tool call. Do not concatenate multiple JSON objects.`,
         {
             path: z.string().optional().describe("Single markdown file path (inside BASE_DIRS)."),
             paths: z.array(z.string()).max(MAX_PATHS).optional().describe(`Array of markdown file paths (max ${MAX_PATHS}).`),

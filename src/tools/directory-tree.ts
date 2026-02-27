@@ -17,21 +17,11 @@ export function registerDirectoryTree(server: McpServer) {
 Use when:
 - You need a high-level map of folders/files before searching.
 
-Do not use when:
-- You need one-level listing with item sizes (use list_directory).
-- You need content/tag search (use search_markdown).
-
 Input rules:
 - "path" should be a directory.
 - Keep "depth" small to avoid overly large outputs.
-
-Good examples:
-- {"path":".","depth":2}
-- {"path":"docs","depth":3,"markdownOnly":true}
-
-Bad examples:
-- {"path":"README.md","depth":2}  // file path, not a directory
-- {"query":"project"}  // query search belongs to search_markdown`,
+- Paths are relative to BASE_DIR. Do not repeat the BASE_DIR name in the path (e.g. if BASE_DIR ends with "Projects", use "subfolder/file.md" not "Projects/subfolder/file.md").
+- Send exactly one JSON object per tool call. Do not concatenate multiple JSON objects.`,
         {
             path: z.string().optional().default(".").describe("Root directory path for the tree. Defaults to base directory if omitted."),
             depth: z.number().optional().default(3).describe("Maximum depth to display (integer >= 1). Larger values increase output size/tokens (default 3)."),

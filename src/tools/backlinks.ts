@@ -148,22 +148,12 @@ Use when:
 - You already know the target note path.
 - You need backlink context (who references this note).
 
-Do not use when:
-- You need outgoing links from a file (use get_linked_files).
-- You need semantic discovery by text query (use search_markdown).
-
 Input rules:
 - "path" is the target file path to be referenced.
 - "directory" limits backlink scan scope.
 - "maxResults" is clamped; increase carefully for large vaults.
-
-Good examples:
-- {"path":"notes/project.md"}
-- {"path":"notes/architecture.md","directory":"notes","maxResults":30}
-
-Bad examples:
-- {"query":"project"}  // discovery belongs to search_markdown
-- {"path":"notes"}  // directory path, not a file`,
+- Paths are relative to BASE_DIR. Do not repeat the BASE_DIR name in the path (e.g. if BASE_DIR ends with "Projects", use "subfolder/file.md" not "Projects/subfolder/file.md").
+- Send exactly one JSON object per tool call. Do not concatenate multiple JSON objects.`,
         {
             path: z.string().describe("Target file path to find backlinks for."),
             directory: z.string().optional().default(".").describe("Root directory to search for backlinks. Defaults to base directory."),

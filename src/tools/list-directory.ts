@@ -18,21 +18,11 @@ Use when:
 - You want controlled, step-by-step exploration.
 - You need immediate child folders/files with sizes.
 
-Do not use when:
-- You need recursive tree output (use get_directory_tree).
-- You need semantic search by query/tag/content (use search_markdown).
-
 Input rules:
 - "path" should be a directory.
 - Call repeatedly on child directories to explore deeper.
-
-Good examples:
-- {"path":"notes"}
-- {"path":"notes/projectA","markdownOnly":false}
-
-Bad examples:
-- {"path":"README.md"}  // file path, not a directory
-- {"query":"project"}  // query search belongs to search_markdown`,
+- Paths are relative to BASE_DIR. Do not repeat the BASE_DIR name in the path (e.g. if BASE_DIR ends with "Projects", use "subfolder/file.md" not "Projects/subfolder/file.md").
+- Send exactly one JSON object per tool call. Do not concatenate multiple JSON objects.`,
         {
             path: z.string().optional().default(".").describe("Directory path to list. Defaults to base directory."),
             markdownOnly: z.boolean().optional().default(true).describe("If true, show only markdown files and directories."),

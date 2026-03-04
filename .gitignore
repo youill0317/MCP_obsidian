@@ -3,6 +3,8 @@ node_modules/
 
 # Build output
 dist/
+coverage/
+*.tsbuildinfo
 
 # IDE
 .vscode/
@@ -15,7 +17,17 @@ Thumbs.db
 # Logs
 *.log
 npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
 
-# Environment
+# Environment / secrets
 .env
-.env.local
+.env.*
+!.env.example
+!.env.sample
+!.env.template
+.npmrc
+
+# Cache
+.eslintcache

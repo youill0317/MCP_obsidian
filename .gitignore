@@ -28,6 +28,21 @@ pnpm-debug.log*
 !.env.sample
 !.env.template
 .npmrc
+*.pem
+*.key
+*.p12
+*.pfx
+*.crt
+*.cer
+*.der
+id_rsa
+id_dsa
+secrets.json
+secrets.yaml
+secrets.yml
+config/secrets.json
+config/secrets.yaml
+config/secrets.yml
 
 # Cache
 .eslintcache

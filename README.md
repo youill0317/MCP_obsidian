@@ -22,22 +22,30 @@ npm run build
 npm start
 ```
 
-## Client Configuration (Claude Desktop)
+## Client Configuration (Claude Code)
 
-Add this server to `claude_desktop_config.json`:
+Add this server entry to Claude Code client JSON (`mcpServers`):
 
 ```json
 {
   "mcpServers": {
-    "markdown-explorer": {
+    "mcp_obsidian": {
       "command": "node",
       "args": [
-        "C:\\Users\\user\\Documents\\Projects_src\\MCP\\MCP_Obsidian\\dist\\index.js"
-      ]
+        "C:/path/to/MCP/MCP_Obsidian/dist/index.js"
+      ],
+      "env": {
+        "MARKDOWN_BASE_DIR": "C:/path/to/your/ObsidianVault",
+        "LOG_LEVEL": "info"
+      }
     }
   }
 }
 ```
+
+Notes:
+- `MARKDOWN_BASE_DIR` can contain multiple roots separated by `;` (Windows), for example `C:/VaultA;C:/VaultB`.
+- If `MARKDOWN_BASE_DIR` is omitted, the server uses its current working directory.
 
 ## Canonical Workflow (Use This Order)
 

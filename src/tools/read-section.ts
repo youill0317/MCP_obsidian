@@ -16,9 +16,9 @@ export function registerReadSection(server: McpServer) {
         "read_markdown_section",
         "Read one named section from a known markdown file.",
         {
-            path: z.string().describe("Required markdown file path (inside BASE_DIRS)."),
-            header: z.string().describe("Required target header text. Leading '#' is ignored."),
-            includeSubsections: z.boolean().optional().default(true).describe("If true, include nested subsections until same or higher header level."),
+            path: z.string().describe("Markdown file path."),
+            header: z.string().describe("Header text."),
+            includeSubsections: z.boolean().optional().default(true).describe("Include nested subsections."),
         },
         async ({ path: filePath, header, includeSubsections }) => {
             try {

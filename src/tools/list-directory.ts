@@ -12,12 +12,12 @@ import {
 export function registerListDirectory(server: McpServer) {
     server.tool(
         "list_directory",
-        "List one directory level inside BASE_DIRS.",
+        "List one directory level.",
         {
-            path: z.string().optional().default(".").describe("Directory path to list. Defaults to base directory."),
-            markdownOnly: z.boolean().optional().default(true).describe("If true, show only markdown files and directories."),
-            showHidden: z.boolean().optional().default(false).describe("Include hidden entries (names starting with .)."),
-            respectGitignore: z.boolean().optional().default(true).describe("If true, apply .gitignore rules to exclude paths."),
+            path: z.string().optional().default(".").describe("Directory path."),
+            markdownOnly: z.boolean().optional().default(true).describe("Show only markdown entries."),
+            showHidden: z.boolean().optional().default(false).describe("Include hidden entries."),
+            respectGitignore: z.boolean().optional().default(true).describe("Apply gitignore filtering."),
         },
         async ({ path: dirPath, markdownOnly, showHidden, respectGitignore }) => {
             try {

@@ -17,10 +17,10 @@ import {
 export function registerReadFull(server: McpServer) {
     server.tool(
         "read_markdown_full",
-        "Read one or more markdown files, including frontmatter and body. Provide `path` or `paths`, not both.",
+        "Read one or more markdown files.",
         {
-            path: z.string().optional().describe("Single markdown file path (inside BASE_DIRS)."),
-            paths: z.array(z.string()).max(MAX_PATHS).optional().describe(`Array of markdown file paths (max ${MAX_PATHS}).`),
+            path: z.string().optional().describe("Markdown file path."),
+            paths: z.array(z.string()).max(MAX_PATHS).optional().describe("Markdown file paths."),
         },
         async ({ path: singlePath, paths: multiplePaths }) => {
             try {

@@ -18,8 +18,8 @@ export function registerLinkedFiles(server: McpServer) {
         "List outgoing links from a markdown file.",
         {
             path: z.string().describe("Markdown file path."),
-            type: z.enum(["all", "markdown", "image", "external", "embed"]).optional().default("all").describe("Optional type filter: all | markdown | image | external | embed."),
-            checkExists: z.boolean().optional().default(false).describe("If true, verify local link targets exist (slower)."),
+            type: z.enum(["all", "markdown", "image", "external", "embed"]).optional().default("all").describe("Link type filter."),
+            checkExists: z.boolean().optional().default(false).describe("Check local target existence."),
         },
         async ({ path: filePath, type, checkExists }) => {
             try {

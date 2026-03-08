@@ -9,10 +9,10 @@ import {
 export function registerReadToc(server: McpServer) {
     server.tool(
         "read_markdown_toc",
-        "Read markdown headings from a known file as a table of contents.",
+        "Read markdown headings from a file.",
         {
-            path: z.string().describe("Markdown file path (must be a file)."),
-            maxLevel: z.number().optional().default(6).describe("Maximum header level to include (integer 1-6)."),
+            path: z.string().describe("Markdown file path."),
+            maxLevel: z.number().optional().default(6).describe("Maximum heading level."),
         },
         async ({ path: filePath, maxLevel }) => {
             try {

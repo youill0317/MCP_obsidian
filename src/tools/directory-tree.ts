@@ -12,13 +12,13 @@ import {
 export function registerDirectoryTree(server: McpServer) {
     server.tool(
         "get_directory_tree",
-        "Show a recursive directory tree for a directory inside BASE_DIRS.",
+        "Show a recursive directory tree.",
         {
-            path: z.string().optional().default(".").describe("Root directory path for the tree. Defaults to base directory if omitted."),
-            depth: z.number().optional().default(3).describe("Maximum depth to display (integer >= 1). Larger values increase output size/tokens (default 3)."),
-            markdownOnly: z.boolean().optional().default(true).describe("Show only markdown files (.md/.mdx/.markdown) and directories. Default: true."),
-            showHidden: z.boolean().optional().default(false).describe("Include hidden entries (names starting with .)."),
-            respectGitignore: z.boolean().optional().default(true).describe("Apply .gitignore rules to exclude paths."),
+            path: z.string().optional().default(".").describe("Root directory path."),
+            depth: z.number().optional().default(3).describe("Maximum depth."),
+            markdownOnly: z.boolean().optional().default(true).describe("Show only markdown entries."),
+            showHidden: z.boolean().optional().default(false).describe("Include hidden entries."),
+            respectGitignore: z.boolean().optional().default(true).describe("Apply gitignore filtering."),
         },
         async ({ path: dirPath, depth, markdownOnly, showHidden, respectGitignore }) => {
             try {

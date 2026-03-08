@@ -142,12 +142,12 @@ function extractLinksFromLine(line: string): ParsedLink[] {
 export function registerBacklinks(server: McpServer) {
     server.tool(
         "get_backlinks",
-        "Find markdown files that reference a target note within a directory scope.",
+        "Find backlinks to a markdown note.",
         {
-            path: z.string().describe("Target file path to find backlinks for."),
-            directory: z.string().optional().default(".").describe("Root directory to search for backlinks. Defaults to base directory."),
-            maxResults: z.number().optional().default(20).describe(`Maximum backlinks to return (max ${MAX_RESULTS}).`),
-            respectGitignore: z.boolean().optional().default(true).describe("Apply .gitignore rules."),
+            path: z.string().describe("Target markdown file path."),
+            directory: z.string().optional().default(".").describe("Search directory."),
+            maxResults: z.number().optional().default(20).describe("Maximum results."),
+            respectGitignore: z.boolean().optional().default(true).describe("Apply gitignore filtering."),
         },
         async ({ path: targetPath, directory, maxResults, respectGitignore }) => {
             try {

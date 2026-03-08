@@ -150,11 +150,8 @@ export function registerVaultContext(server: McpServer) {
                             topTags,
                             stats,
                             tips: [
-                                "Use search_markdown first when you do not know exact file paths.",
-                                "Then read known files with read_markdown_full(path/paths) or read_markdown_section(path, header).",
-                                "Do not use read tools as search substitutes.",
-                                "For link direction: get_linked_files = outgoing, get_backlinks = incoming.",
-                                "For structure only: use get_directory_tree or list_directory (not search_markdown).",
+                                "Workflow guidance lives in skills such as mcp-obsidian and workflow-orchestrator.",
+                                "This resource is a vault snapshot, not a decision policy.",
                             ],
                         }, null, 2),
                     }],

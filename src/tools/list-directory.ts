@@ -12,17 +12,7 @@ import {
 export function registerListDirectory(server: McpServer) {
     server.tool(
         "list_directory",
-        `Navigation tool for one-level directory listing.
-
-Use when:
-- You want controlled, step-by-step exploration.
-- You need immediate child folders/files with sizes.
-
-Input rules:
-- "path" should be a directory.
-- Call repeatedly on child directories to explore deeper.
-- Paths are relative to BASE_DIR. Do not repeat the BASE_DIR name in the path (e.g. if BASE_DIR ends with "Projects", use "subfolder/file.md" not "Projects/subfolder/file.md").
-- Send exactly one JSON object per tool call. Do not concatenate multiple JSON objects.`,
+        "List one directory level inside BASE_DIRS.",
         {
             path: z.string().optional().default(".").describe("Directory path to list. Defaults to base directory."),
             markdownOnly: z.boolean().optional().default(true).describe("If true, show only markdown files and directories."),
@@ -114,10 +104,6 @@ Input rules:
 
                 let header = `${normalizedPath}\n`;
                 header += `${dirCount} directories, ${fileCount} files\n`;
-
-                if (dirCount > 0) {
-                    header += `\nTip: Call list_directory on any subdirectory to explore deeper.\n`;
-                }
 
                 return {
                     content: [{

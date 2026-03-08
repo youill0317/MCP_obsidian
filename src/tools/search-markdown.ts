@@ -25,18 +25,7 @@ function parseOptionalDate(value: string | undefined, label: string): Date | nul
 export function registerSearchMarkdown(server: McpServer) {
     server.tool(
         "search_markdown",
-        `Discovery tool for markdown files (filename + frontmatter tags + content).
-
-Use when:
-- You need to FIND candidate files.
-- You do not know exact file paths yet.
-
-Input rules:
-- Provide one clear query intent per call.
-- "useRegex" and "fuzzy" cannot both be true.
-- "modifiedAfter"/"modifiedBefore" must be ISO dates (YYYY-MM-DD recommended).
-- "directory" is relative to BASE_DIR. Do not repeat the BASE_DIR name in the path (e.g. if BASE_DIR ends with "Projects", use "subfolder" not "Projects/subfolder").
-- Send exactly one JSON object per tool call. Do not concatenate multiple JSON objects.`,
+        "Search markdown files by filename, frontmatter tags, and body content.",
         {
             query: z.string().describe("Required. Single discovery query string. Keep one intent per call."),
             tag: z.string().optional().describe("Optional frontmatter tag filter (substring match, case-insensitive)."),
@@ -101,7 +90,7 @@ Input rules:
                     return {
                         content: [{
                             type: "text",
-                            text: `No results for "${normalizedQuery}".\n\nSuggestions:\n  - Try a different query\n  - Run get_directory_tree to inspect the folder structure`,
+                            text: `No results for "${normalizedQuery}".`,
                         }],
                         structuredContent: {
                             query: normalizedQuery,

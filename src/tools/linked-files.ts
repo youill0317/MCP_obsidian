@@ -15,18 +15,7 @@ import {
 export function registerLinkedFiles(server: McpServer) {
     server.tool(
         "get_linked_files",
-        `Link analysis tool for one markdown file. Extracts markdown links, wiki links, images, embeds, and external links.
-
-Use when:
-- You need outgoing link inventory from a known note.
-- You need optional existence checks for local targets.
-
-Input rules:
-- "path" must be one markdown file.
-- "checkExists": true may be slower (per-link file checks).
-- "type" filters output by link category.
-- Paths are relative to BASE_DIR. Do not repeat the BASE_DIR name in the path (e.g. if BASE_DIR ends with "Projects", use "subfolder/file.md" not "Projects/subfolder/file.md").
-- Send exactly one JSON object per tool call. Do not concatenate multiple JSON objects.`,
+        "List outgoing links from a markdown file.",
         {
             path: z.string().describe("Markdown file path."),
             type: z.enum(["all", "markdown", "image", "external", "embed"]).optional().default("all").describe("Optional type filter: all | markdown | image | external | embed."),

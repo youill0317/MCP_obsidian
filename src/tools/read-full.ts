@@ -17,18 +17,7 @@ import {
 export function registerReadFull(server: McpServer) {
     server.tool(
         "read_markdown_full",
-        `Read tool for full markdown content (frontmatter + body) from known file path(s).
-
-Use when:
-- You already know exact file path(s).
-- You need complete file content, not just one section.
-
-Input rules:
-- Provide either "path" OR "paths", never both.
-- "paths" supports up to ${MAX_PATHS} files.
-- Only markdown files are allowed.
-- Paths are relative to BASE_DIR. Do not repeat the BASE_DIR name in the path (e.g. if BASE_DIR ends with "Projects", use "subfolder/file.md" not "Projects/subfolder/file.md").
-- Send exactly one JSON object per tool call. Do not concatenate multiple JSON objects.`,
+        "Read one or more markdown files, including frontmatter and body. Provide `path` or `paths`, not both.",
         {
             path: z.string().optional().describe("Single markdown file path (inside BASE_DIRS)."),
             paths: z.array(z.string()).max(MAX_PATHS).optional().describe(`Array of markdown file paths (max ${MAX_PATHS}).`),

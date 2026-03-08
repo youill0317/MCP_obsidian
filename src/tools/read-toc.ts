@@ -9,17 +9,7 @@ import {
 export function registerReadToc(server: McpServer) {
     server.tool(
         "read_markdown_toc",
-        `Read tool for markdown structure. Extracts headers (H1-H6) as a table of contents.
-
-Use when:
-- You need a quick structural overview before reading sections.
-
-Input rules:
-- "path" must point to one markdown file.
-- "maxLevel" must be an integer 1..6.
-- Headers inside fenced code blocks are ignored.
-- Paths are relative to BASE_DIR. Do not repeat the BASE_DIR name in the path (e.g. if BASE_DIR ends with "Projects", use "subfolder/file.md" not "Projects/subfolder/file.md").
-- Send exactly one JSON object per tool call. Do not concatenate multiple JSON objects.`,
+        "Read markdown headings from a known file as a table of contents.",
         {
             path: z.string().describe("Markdown file path (must be a file)."),
             maxLevel: z.number().optional().default(6).describe("Maximum header level to include (integer 1-6)."),

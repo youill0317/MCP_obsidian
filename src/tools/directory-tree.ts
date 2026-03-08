@@ -12,16 +12,7 @@ import {
 export function registerDirectoryTree(server: McpServer) {
     server.tool(
         "get_directory_tree",
-        `Navigation tool for recursive tree overview (folder structure only).
-
-Use when:
-- You need a high-level map of folders/files before searching.
-
-Input rules:
-- "path" should be a directory.
-- Keep "depth" small to avoid overly large outputs.
-- Paths are relative to BASE_DIR. Do not repeat the BASE_DIR name in the path (e.g. if BASE_DIR ends with "Projects", use "subfolder/file.md" not "Projects/subfolder/file.md").
-- Send exactly one JSON object per tool call. Do not concatenate multiple JSON objects.`,
+        "Show a recursive directory tree for a directory inside BASE_DIRS.",
         {
             path: z.string().optional().default(".").describe("Root directory path for the tree. Defaults to base directory if omitted."),
             depth: z.number().optional().default(3).describe("Maximum depth to display (integer >= 1). Larger values increase output size/tokens (default 3)."),

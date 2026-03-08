@@ -14,18 +14,7 @@ import {
 export function registerReadSection(server: McpServer) {
     server.tool(
         "read_markdown_section",
-        `Read tool for one header section from a known markdown file.
-
-Use when:
-- You know the file path and the target header.
-- You want a focused section instead of full file content.
-
-Input rules:
-- "path" is required.
-- "header" must be non-empty (leading '#' is allowed and ignored).
-- Set "includeSubsections" to false for strict single-section extraction.
-- Paths are relative to BASE_DIR. Do not repeat the BASE_DIR name in the path (e.g. if BASE_DIR ends with "Projects", use "subfolder/file.md" not "Projects/subfolder/file.md").
-- Send exactly one JSON object per tool call. Do not concatenate multiple JSON objects.`,
+        "Read one named section from a known markdown file.",
         {
             path: z.string().describe("Required markdown file path (inside BASE_DIRS)."),
             header: z.string().describe("Required target header text. Leading '#' is ignored."),

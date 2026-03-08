@@ -142,18 +142,7 @@ function extractLinksFromLine(line: string): ParsedLink[] {
 export function registerBacklinks(server: McpServer) {
     server.tool(
         "get_backlinks",
-        `Reverse-link analysis tool. Finds markdown files that reference a target file.
-
-Use when:
-- You already know the target note path.
-- You need backlink context (who references this note).
-
-Input rules:
-- "path" is the target file path to be referenced.
-- "directory" limits backlink scan scope.
-- "maxResults" is clamped; increase carefully for large vaults.
-- Paths are relative to BASE_DIR. Do not repeat the BASE_DIR name in the path (e.g. if BASE_DIR ends with "Projects", use "subfolder/file.md" not "Projects/subfolder/file.md").
-- Send exactly one JSON object per tool call. Do not concatenate multiple JSON objects.`,
+        "Find markdown files that reference a target note within a directory scope.",
         {
             path: z.string().describe("Target file path to find backlinks for."),
             directory: z.string().optional().default(".").describe("Root directory to search for backlinks. Defaults to base directory."),

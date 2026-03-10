@@ -67,7 +67,7 @@ Notes:
 | "Which notes link to this note?" | `get_backlinks` | `get_linked_files` |
 | "Show document header outline" | `read_markdown_toc` | `read_markdown_full` for structure-only checks |
 
-## Tools (8)
+## Tools (9)
 
 ### Discovery and Navigation
 
@@ -86,6 +86,7 @@ Notes:
 | `read_markdown_toc` | Read document structure (headers only) | `path`, `maxLevel` |
 | `get_linked_files` | Outgoing links from one note | `path`, `type`, `checkExists` |
 | `get_backlinks` | Incoming links to one target note | `path`, `directory`, `maxResults`, `respectGitignore` |
+| `get_link_health` | Vault-wide link health score with broken/orphan diagnostics | `directory`, `maxResults`, `respectGitignore`, `includeSuggestions` |
 
 ## Resources (2)
 
@@ -125,6 +126,10 @@ Notes:
 5. `get_backlinks`
 - `path` should be a target file path (not directory).
 - Limit scan scope with `directory` for performance.
+
+6. `get_link_health`
+- Use a focused `directory` for very large vaults to reduce scan time.
+- `includeSuggestions=true` adds actionable cleanup guidance.
 
 ## Good vs Bad Query Cookbook
 

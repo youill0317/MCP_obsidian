@@ -13,6 +13,7 @@ import { registerReadSection } from "./tools/read-section.js";
 import { registerReadFull } from "./tools/read-full.js";
 import { registerLinkedFiles } from "./tools/linked-files.js";
 import { registerBacklinks } from "./tools/backlinks.js";
+import { registerLinkHealth } from "./tools/link-health.js";
 
 // Resource registrations
 import { registerVaultContext } from "./resources/vault-context.js";
@@ -33,6 +34,7 @@ registerReadSection(server);
 registerReadFull(server);
 registerLinkedFiles(server);
 registerBacklinks(server);
+registerLinkHealth(server);
 
 // Register resources
 registerVaultContext(server);

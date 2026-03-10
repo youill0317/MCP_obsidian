@@ -22,6 +22,7 @@ export function registerServerInfo(server: McpServer) {
                                 "TOC extraction and section-level reading",
                                 "Full markdown reading with frontmatter parsing",
                                 "Link extraction and backlink discovery",
+                                "Vault-scale link health scoring with orphan/broken-link suggestions",
                                 "Vault context resource with structure, recency, and tag stats",
                             ],
                             tools: [
@@ -33,6 +34,7 @@ export function registerServerInfo(server: McpServer) {
                                 "read_markdown_full",
                                 "get_linked_files",
                                 "get_backlinks",
+                                "get_link_health",
                             ],
                             resources: [
                                 "vault-context",
@@ -47,6 +49,7 @@ export function registerServerInfo(server: McpServer) {
                                 read_markdown_toc: "Read header outline only",
                                 get_linked_files: "Outgoing link analysis",
                                 get_backlinks: "Incoming link analysis",
+                                get_link_health: "Vault link quality score, orphan notes, and cleanup suggestions",
                             },
                             usageNotes: [
                                 "Use workflow skills such as mcp-obsidian or workflow-orchestrator for detailed tool-order guidance.",

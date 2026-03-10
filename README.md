@@ -73,7 +73,7 @@ Notes:
 
 | Tool | Purpose | Main Parameters |
 |---|---|---|
-| `search_markdown` | Unified discovery across filename, frontmatter tags, and content | `query`, `tag`, `filenamePattern`, `directory`, `maxResults`, `useRegex`, `fuzzy`, `frontmatterFilter`, `modifiedAfter`, `modifiedBefore` |
+| `search_markdown` | Unified discovery across filename, frontmatter tags, and content | `query`, `tag`, `filenamePattern`, `directory`, `maxResults`, `useRegex`, `fuzzy`, `readFullContent`, `frontmatterFilter`, `modifiedAfter`, `modifiedBefore` |
 | `get_directory_tree` | Recursive tree overview (structure only) | `path`, `depth`, `markdownOnly`, `showHidden`, `respectGitignore` |
 | `list_directory` | One-level listing with file sizes | `path`, `markdownOnly`, `showHidden`, `respectGitignore` |
 
@@ -82,7 +82,7 @@ Notes:
 | Tool | Purpose | Main Parameters |
 |---|---|---|
 | `read_markdown_full` | Read frontmatter + full body for known file path(s) | `path` or `paths[]` |
-| `read_markdown_section` | Read one header section from a known file | `path`, `header`, `includeSubsections` |
+| `read_markdown_section` | Read one header section from a known file | `path`, `header`, `occurrence`, `includeSubsections` |
 | `read_markdown_toc` | Read document structure (headers only) | `path`, `maxLevel` |
 | `get_linked_files` | Outgoing links from one note | `path`, `type`, `checkExists` |
 | `get_backlinks` | Incoming links to one target note | `path`, `directory`, `maxResults`, `respectGitignore` |
@@ -105,6 +105,7 @@ Notes:
 1. `search_markdown`
 - Always provide a non-empty `query`.
 - Do not set `useRegex=true` and `fuzzy=true` together.
+- For higher content-match recall on large files, set `readFullContent=true` (slower).
 - Date filters must be ISO-like strings (`YYYY-MM-DD` recommended).
 - Keep one search intent per call.
 

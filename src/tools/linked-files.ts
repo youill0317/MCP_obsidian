@@ -2,6 +2,8 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import * as fs from "fs/promises";
 import * as path from "path";
+import { BASE_DIRS } from "../config.js";
+import { collectMarkdownFiles } from "../core/markdown-search.js";
 import {
     normalizeAndValidatePath,
     accessDeniedError,
@@ -60,6 +62,28 @@ export function registerLinkedFiles(server: McpServer) {
                 const imageRegex = /!\[([^\]]*)\]\(([^)]+)\)/g;
 
                 const imageExtensions = [".png", ".jpg", ".jpeg", ".gif", ".bmp", ".svg", ".webp"];
+                type WikiNameIndex = Map<string, string[]>;
+
+                async function buildWikiNameIndex(): Promise<WikiNameIndex> {
+                    const index: WikiNameIndex = new Map();
+
+                    for (const baseDir of BASE_DIRS) {
+                        const markdownFiles = await collectMarkdownFiles({ rootDir: baseDir, respectGitignore: true });
+                        for (const markdownFile of markdownFiles) {
+                            const baseName = path.basename(markdownFile, path.extname(markdownFile)).toLowerCase();
+                            const existing = index.get(baseName);
+                            if (existing) {
+                                existing.push(markdownFile);
+                            } else {
+                                index.set(baseName, [markdownFile]);
+                            }
+                        }
+                    }
+
+                    return index;
+                }
+
+                const wikiNameIndex = checkExists ? await buildWikiNameIndex() : null;
 
                 async function checkLinkTargetExists(linkInfo: LinkInfo, unresolvedPath: string): Promise<void> {
                     const resolvedPath = path.resolve(fileDir, unresolvedPath);
@@ -73,6 +97,44 @@ export function registerLinkedFiles(server: McpServer) {
 
                     linkInfo.resolvedPath = validated;
                     linkInfo.exists = await exists(validated);
+                }
+
+                async function checkWikiLinkTargetExists(linkInfo: LinkInfo, wikiTarget: string): Promise<void> {
+                    const baseTarget = wikiTarget.split("#", 1)[0].trim();
+                    if (!baseTarget) {
+                        linkInfo.exists = false;
+                        return;
+                    }
+
+                    const looksLikePath = baseTarget.includes("/") || baseTarget.includes("\\") || baseTarget.startsWith(".");
+                    if (looksLikePath) {
+                        const wikiPath = path.extname(baseTarget) ? baseTarget : `${baseTarget}.md`;
+                        await checkLinkTargetExists(linkInfo, wikiPath);
+                        return;
+                    }
+
+                    const lookupKey = path.basename(baseTarget, path.extname(baseTarget)).toLowerCase();
+                    const candidates = wikiNameIndex?.get(lookupKey) || [];
+                    if (candidates.length === 0) {
+                        linkInfo.exists = false;
+                        return;
+                    }
+
+                    for (const candidate of candidates) {
+                        const validated = normalizeAndValidatePath(candidate);
+                        if (!validated) {
+                            continue;
+                        }
+
+                        const candidateExists = await exists(validated);
+                        if (candidateExists) {
+                            linkInfo.exists = true;
+                            linkInfo.resolvedPath = validated;
+                            return;
+                        }
+                    }
+
+                    linkInfo.exists = false;
                 }
 
                 for (let i = 0; i < lines.length; i++) {
@@ -125,8 +187,7 @@ export function registerLinkedFiles(server: McpServer) {
                             };
 
                             if (checkExists) {
-                                const wikiPath = target.endsWith(".md") ? target : `${target}.md`;
-                                await checkLinkTargetExists(linkInfo, wikiPath);
+                                await checkWikiLinkTargetExists(linkInfo, target);
                             }
 
                             links.push(linkInfo);

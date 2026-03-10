@@ -35,6 +35,7 @@ export function registerSearchMarkdown(server: McpServer) {
             respectGitignore: z.boolean().optional().default(true).describe("Apply gitignore filtering."),
             useRegex: z.boolean().optional().default(false).describe("Use regex matching."),
             fuzzy: z.boolean().optional().default(false).describe("Use fuzzy matching."),
+            readFullContent: z.boolean().optional().default(false).describe("Read full content for content matching (higher accuracy, slower)."),
             frontmatterFilter: z.record(z.string()).optional().describe("Frontmatter filters."),
             modifiedAfter: z.string().optional().describe("Modified-after filter."),
             modifiedBefore: z.string().optional().describe("Modified-before filter."),
@@ -48,6 +49,7 @@ export function registerSearchMarkdown(server: McpServer) {
             respectGitignore,
             useRegex,
             fuzzy,
+            readFullContent,
             frontmatterFilter,
             modifiedAfter,
             modifiedBefore,
@@ -70,13 +72,14 @@ export function registerSearchMarkdown(server: McpServer) {
                 const afterDate = parseOptionalDate(modifiedAfter, "modifiedAfter");
                 const beforeDate = parseOptionalDate(modifiedBefore, "modifiedBefore");
 
-                const { normalizedQuery, results } = await searchMarkdownFiles({
+                const { normalizedQuery, contentScannedMode, results } = await searchMarkdownFiles({
                     rootDir: normalizedPath,
                     query,
                     maxResults,
                     respectGitignore,
                     useRegex,
                     fuzzy,
+                    readFullContent,
                     tag,
                     filenamePattern,
                     frontmatterFilter,
@@ -94,6 +97,7 @@ export function registerSearchMarkdown(server: McpServer) {
                         }],
                         structuredContent: {
                             query: normalizedQuery,
+                            contentScannedMode,
                             totalResults: 0,
                             results: [],
                         },
@@ -140,6 +144,7 @@ export function registerSearchMarkdown(server: McpServer) {
                     content: [{ type: "text", text: output.trim() }],
                     structuredContent: {
                         query: normalizedQuery,
+                        contentScannedMode,
                         totalResults: results.length,
                         results: results.map((item) => ({
                             path: item.path,

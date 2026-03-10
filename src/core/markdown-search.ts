@@ -54,6 +54,7 @@ export interface SearchMarkdownFilesOptions {
 
 export interface SearchMarkdownFilesResult {
     normalizedQuery: string;
+    contentScannedMode: "full" | "sampled";
     results: MarkdownSearchResult[];
 }
 
@@ -80,6 +81,35 @@ async function readFileSample(filePath: string, sampleBytes: number): Promise<st
         const buffer = Buffer.alloc(sampleBytes);
         const { bytesRead } = await fileHandle.read(buffer, 0, sampleBytes, 0);
         return buffer.toString("utf8", 0, bytesRead);
+    } finally {
+        await fileHandle.close();
+    }
+}
+
+async function readStrategicSample(filePath: string, sampleBytes: number): Promise<string> {
+    if (sampleBytes <= 0) {
+        return "";
+    }
+
+    const fileStat = await fs.stat(filePath);
+    if (fileStat.size <= sampleBytes) {
+        return fs.readFile(filePath, "utf8");
+    }
+
+    const segmentSize = Math.max(256, Math.floor(sampleBytes / 3));
+    const middleStart = Math.max(0, Math.floor(fileStat.size / 2) - Math.floor(segmentSize / 2));
+    const tailStart = Math.max(0, fileStat.size - segmentSize);
+
+    const starts = [0, middleStart, tailStart];
+    const fileHandle = await fs.open(filePath, "r");
+    try {
+        const chunks: string[] = [];
+        for (const start of starts) {
+            const buffer = Buffer.alloc(segmentSize);
+            const { bytesRead } = await fileHandle.read(buffer, 0, segmentSize, start);
+            chunks.push(buffer.toString("utf8", 0, bytesRead));
+        }
+        return chunks.join("\n");
     } finally {
         await fileHandle.close();
     }
@@ -239,7 +269,7 @@ export async function searchMarkdownFiles({
         try {
             const content = readFullContent
                 ? await fs.readFile(filePath, "utf8")
-                : await readFileSample(filePath, contentSampleBytes);
+                : await readStrategicSample(filePath, contentSampleBytes);
 
             const metadata = await parseFrontmatter(content);
             if (frontmatterFilter && Object.keys(frontmatterFilter).length > 0) {
@@ -318,6 +348,7 @@ export async function searchMarkdownFiles({
 
     return {
         normalizedQuery,
+        contentScannedMode: readFullContent ? "full" : "sampled",
         results: collectedResults.slice(0, clampedMaxResults),
     };
 }

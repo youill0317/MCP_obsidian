@@ -3,6 +3,7 @@ import { z } from "zod";
 import * as fs from "fs/promises";
 import * as path from "path";
 import { MARKDOWN_EXTENSIONS, MAX_RESULTS } from "../config.js";
+import { collectMarkdownFiles } from "../core/markdown-search.js";
 import { logger } from "../logger.js";
 import {
     normalizeAndValidatePath,
@@ -10,8 +11,6 @@ import {
     createErrorResponse,
     pathNotFoundError,
     exists,
-    isMarkdownFile,
-    loadGitignore,
 } from "../utils.js";
 
 type BacklinkReferenceType = "wiki-link" | "markdown-link" | "embed";
@@ -20,6 +19,8 @@ interface ParsedLink {
     target: string;
     type: BacklinkReferenceType;
 }
+
+type WikiNameIndex = Map<string, string[]>;
 
 function normalizeForComparison(filePath: string): string {
     const normalized = path.normalize(filePath).replace(/\\/g, "/");
@@ -64,7 +65,26 @@ function parseMarkdownDestination(rawDestination: string): string {
     return firstToken ? firstToken[1] : "";
 }
 
-function resolveLinkCandidates(sourceFilePath: string, rawTarget: string): string[] {
+function buildWikiNameIndex(files: string[]): WikiNameIndex {
+    const index: WikiNameIndex = new Map();
+    for (const filePath of files) {
+        const baseName = path.basename(filePath, path.extname(filePath)).toLowerCase();
+        const existing = index.get(baseName);
+        if (existing) {
+            existing.push(filePath);
+        } else {
+            index.set(baseName, [filePath]);
+        }
+    }
+    return index;
+}
+
+function resolveLinkCandidates(
+    sourceFilePath: string,
+    rawTarget: string,
+    linkType: BacklinkReferenceType,
+    wikiNameIndex: WikiNameIndex
+): string[] {
     let target = rawTarget.trim();
     if (!target) {
         return [];
@@ -94,6 +114,15 @@ function resolveLinkCandidates(sourceFilePath: string, rawTarget: string): strin
     if (!path.extname(target)) {
         for (const extension of MARKDOWN_EXTENSIONS) {
             candidates.add(normalizeForComparison(`${resolvedBase}${extension}`));
+        }
+    }
+
+    const looksLikePath = target.includes("/") || target.includes("\\") || target.startsWith(".");
+    if (linkType === "wiki-link" && !looksLikePath) {
+        const wikiBaseName = path.basename(target, path.extname(target)).toLowerCase();
+        const indexedPaths = wikiNameIndex.get(wikiBaseName) || [];
+        for (const indexedPath of indexedPaths) {
+            candidates.add(normalizeForComparison(indexedPath));
         }
     }
 
@@ -174,6 +203,11 @@ export function registerBacklinks(server: McpServer) {
                 const clampedMax = Math.min(Math.max(1, maxResults), MAX_RESULTS);
                 const targetBaseName = path.basename(targetFilePath);
                 const targetComparablePath = normalizeForComparison(path.resolve(targetFilePath));
+                const markdownFiles = await collectMarkdownFiles({
+                    rootDir: normalizedDir,
+                    respectGitignore,
+                });
+                const wikiNameIndex = buildWikiNameIndex(markdownFiles);
 
                 interface BacklinkResult {
                     sourceFile: string;
@@ -181,8 +215,6 @@ export function registerBacklinks(server: McpServer) {
                 }
 
                 const results: BacklinkResult[] = [];
-                const ig = respectGitignore ? await loadGitignore(normalizedDir) : null;
-
                 async function checkFileForBacklinks(filePath: string): Promise<void> {
                     if (path.resolve(filePath) === path.resolve(targetFilePath)) return;
 
@@ -207,7 +239,7 @@ export function registerBacklinks(server: McpServer) {
 
                             let matchedType: BacklinkReferenceType | null = null;
                             for (const link of links) {
-                                const candidates = resolveLinkCandidates(filePath, link.target);
+                                const candidates = resolveLinkCandidates(filePath, link.target, link.type, wikiNameIndex);
                                 if (candidates.includes(targetComparablePath)) {
                                     matchedType = link.type;
                                     break;
@@ -234,42 +266,12 @@ export function registerBacklinks(server: McpServer) {
                     }
                 }
 
-                async function walkForBacklinks(dir: string): Promise<void> {
-                    if (results.length >= clampedMax) return;
-
-                    try {
-                        const entries = await fs.readdir(dir, { withFileTypes: true });
-                        const fileEntries: string[] = [];
-                        const dirEntries: string[] = [];
-
-                        for (const entry of entries) {
-                            const fullPath = path.join(dir, entry.name);
-                            const relativePath = path.relative(normalizedDir, fullPath);
-
-                            if (ig && ig.ignores(relativePath)) continue;
-
-                            if (entry.isDirectory()) {
-                                dirEntries.push(fullPath);
-                            } else if (entry.isFile() && isMarkdownFile(entry.name)) {
-                                fileEntries.push(fullPath);
-                            }
-                        }
-
-                        const BATCH_SIZE = 10;
-                        for (let i = 0; i < fileEntries.length; i += BATCH_SIZE) {
-                            const batch = fileEntries.slice(i, i + BATCH_SIZE);
-                            await Promise.allSettled(batch.map((filePath) => checkFileForBacklinks(filePath)));
-                        }
-
-                        for (const dirPath of dirEntries) {
-                            await walkForBacklinks(dirPath);
-                        }
-                    } catch (error) {
-                        logger.debug(`backlinks: failed to read directory: ${dir}`, error);
-                    }
+                const BATCH_SIZE = 10;
+                for (let i = 0; i < markdownFiles.length; i += BATCH_SIZE) {
+                    if (results.length >= clampedMax) break;
+                    const batch = markdownFiles.slice(i, i + BATCH_SIZE);
+                    await Promise.allSettled(batch.map((filePath) => checkFileForBacklinks(filePath)));
                 }
-
-                await walkForBacklinks(normalizedDir);
 
                 if (results.length === 0) {
                     return {

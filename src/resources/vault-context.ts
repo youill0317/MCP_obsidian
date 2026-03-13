@@ -21,7 +21,7 @@ export function registerVaultContext(server: McpServer) {
                         const ig = await loadGitignore(baseDir);
                         const entries = await fs.readdir(baseDir, { withFileTypes: true });
                         for (const entry of entries) {
-                            if (entry.name.startsWith(".")) continue;
+                            if (entry.isDirectory() && entry.name.startsWith(".")) continue;
                             if (ig.ignores(entry.name)) continue;
 
                             if (entry.isDirectory()) {
@@ -48,10 +48,11 @@ export function registerVaultContext(server: McpServer) {
                     try {
                         const entries = await fs.readdir(dir, { withFileTypes: true });
                         for (const entry of entries) {
+                            if (entry.isDirectory() && entry.name.startsWith(".")) continue;
+
                             const fullPath = path.join(dir, entry.name);
                             const relativePath = path.relative(baseDir, fullPath);
 
-                            if (entry.name.startsWith(".")) continue;
                             if (ig.ignores(relativePath)) continue;
 
                             if (entry.isDirectory()) {
@@ -86,10 +87,11 @@ export function registerVaultContext(server: McpServer) {
                     try {
                         const entries = await fs.readdir(dir, { withFileTypes: true });
                         for (const entry of entries) {
+                            if (entry.isDirectory() && entry.name.startsWith(".")) continue;
+
                             const fullPath = path.join(dir, entry.name);
                             const relativePath = path.relative(baseDir, fullPath);
 
-                            if (entry.name.startsWith(".")) continue;
                             if (ig.ignores(relativePath)) continue;
 
                             if (entry.isDirectory()) {

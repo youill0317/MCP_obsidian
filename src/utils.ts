@@ -1,17 +1,161 @@
 import * as fs from "fs/promises";
+import * as fsSync from "fs";
 import * as path from "path";
 import ignore, { Ignore } from "ignore";
 import { MARKDOWN_EXTENSIONS, BASE_DIRS, PRIMARY_BASE_DIR } from "./config.js";
 import { logger } from "./logger.js";
 
+export interface BaseDirInfo {
+    resolvedPath: string;
+    canonicalPath: string;
+    isHiddenBase: boolean;
+}
+
+export interface PathAccessInfo {
+    matchedBaseDir: BaseDirInfo | null;
+    isWithinBaseDir: boolean;
+    isDotPrefixedDirectory: boolean;
+}
+
+function normalizeForComparison(targetPath: string): string {
+    return process.platform === "win32" ? targetPath.toLowerCase() : targetPath;
+}
+
+function isPathInside(parentPath: string, childPath: string): boolean {
+    const parentComparable = normalizeForComparison(path.resolve(parentPath));
+    const childComparable = normalizeForComparison(path.resolve(childPath));
+    return childComparable === parentComparable || childComparable.startsWith(parentComparable + path.sep);
+}
+
+function isDotPrefixedName(name: string): boolean {
+    return name.startsWith(".") && name !== "." && name !== "..";
+}
+
+function resolveCanonicalPath(targetPath: string): string {
+    const resolvedPath = path.resolve(targetPath);
+    const suffixSegments: string[] = [];
+    let existingPath = resolvedPath;
+
+    while (!fsSync.existsSync(existingPath)) {
+        const parentPath = path.dirname(existingPath);
+        if (parentPath === existingPath) {
+            break;
+        }
+
+        suffixSegments.unshift(path.basename(existingPath));
+        existingPath = parentPath;
+    }
+
+    let canonicalBasePath = existingPath;
+    try {
+        canonicalBasePath = fsSync.realpathSync.native(existingPath);
+    } catch {
+        canonicalBasePath = existingPath;
+    }
+
+    return suffixSegments.length > 0
+        ? path.join(canonicalBasePath, ...suffixSegments)
+        : canonicalBasePath;
+}
+
+function createBaseDirInfo(baseDir: string): BaseDirInfo {
+    const resolvedPath = path.resolve(baseDir);
+    const canonicalPath = resolveCanonicalPath(resolvedPath);
+
+    return {
+        resolvedPath,
+        canonicalPath,
+        isHiddenBase:
+            isDotPrefixedName(path.basename(resolvedPath)) ||
+            isDotPrefixedName(path.basename(canonicalPath)),
+    };
+}
+
+function getMatchedBaseDirInfo(normalizedPath: string, baseDirs: string[]): BaseDirInfo | null {
+    const canonicalPath = resolveCanonicalPath(normalizedPath);
+    const matches = baseDirs
+        .map(createBaseDirInfo)
+        .filter((baseDirInfo) => isPathInside(baseDirInfo.canonicalPath, canonicalPath))
+        .sort((left, right) => right.canonicalPath.length - left.canonicalPath.length);
+
+    return matches[0] ?? null;
+}
+
+export function getPathAccessInfo(normalizedPath: string, baseDirs: string[] = BASE_DIRS): PathAccessInfo {
+    const canonicalPath = resolveCanonicalPath(normalizedPath);
+    const matchedBaseDir = getMatchedBaseDirInfo(normalizedPath, baseDirs);
+
+    if (!matchedBaseDir) {
+        return {
+            matchedBaseDir: null,
+            isWithinBaseDir: false,
+            isDotPrefixedDirectory: false,
+        };
+    }
+
+    if (matchedBaseDir.isHiddenBase) {
+        return {
+            matchedBaseDir,
+            isWithinBaseDir: true,
+            isDotPrefixedDirectory: true,
+        };
+    }
+
+    const relativePath = path.relative(matchedBaseDir.canonicalPath, canonicalPath);
+    if (!relativePath) {
+        return {
+            matchedBaseDir,
+            isWithinBaseDir: true,
+            isDotPrefixedDirectory: false,
+        };
+    }
+
+    const segments = relativePath.split(path.sep).filter((segment) => segment.length > 0);
+    for (let index = 0; index < segments.length; index++) {
+        const segment = segments[index];
+        if (!isDotPrefixedName(segment)) {
+            continue;
+        }
+
+        const isLastSegment = index === segments.length - 1;
+        if (!isLastSegment) {
+            return {
+                matchedBaseDir,
+                isWithinBaseDir: true,
+                isDotPrefixedDirectory: true,
+            };
+        }
+
+        try {
+            return {
+                matchedBaseDir,
+                isWithinBaseDir: true,
+                isDotPrefixedDirectory: fsSync.statSync(normalizedPath).isDirectory(),
+            };
+        } catch {
+            return {
+                matchedBaseDir,
+                isWithinBaseDir: true,
+                isDotPrefixedDirectory: !isMarkdownFile(segment),
+            };
+        }
+    }
+
+    return {
+        matchedBaseDir,
+        isWithinBaseDir: true,
+        isDotPrefixedDirectory: false,
+    };
+}
+
 // ============================================
-// 경로 유틸리티
+// Path utilities
 // ============================================
 
 /**
- * 입력 경로를 절대 경로로 정규화합니다.
- * - 절대 경로: 그대로 사용
- * - 상대 경로: BASE_DIR을 기준으로 해석
+ * Normalize an input path to an absolute path.
+ * - Absolute paths are preserved.
+ * - Relative paths are resolved from the primary base dir.
  */
 export function normalizePath(inputPath: string): string {
     if (path.isAbsolute(inputPath)) {
@@ -20,39 +164,48 @@ export function normalizePath(inputPath: string): string {
     return path.resolve(PRIMARY_BASE_DIR, inputPath);
 }
 
-/**
- * 경로가 허용된 BASE_DIRS 중 하나의 내부에 있는지 검증합니다.
- * 보안: 모든 허용 디렉토리 외부 접근을 차단합니다.
- */
-export function isPathWithinBaseDir(normalizedPath: string): boolean {
-    const resolvedPath = path.resolve(normalizedPath);
-    const pathLower = resolvedPath.toLowerCase();
+export function validatePathAgainstBaseDirs(
+    inputPath: string,
+    baseDirs: string[],
+    primaryBaseDir: string = baseDirs[0] ?? process.cwd()
+): string | null {
+    const normalizedPath = path.isAbsolute(inputPath)
+        ? path.resolve(inputPath)
+        : path.resolve(primaryBaseDir, inputPath);
+    const accessInfo = getPathAccessInfo(normalizedPath, baseDirs);
 
-    return BASE_DIRS.some(baseDir => {
-        const baseLower = path.resolve(baseDir).toLowerCase();
-        // Windows에서 대소문자 무시
-        return pathLower === baseLower || pathLower.startsWith(baseLower + path.sep);
-    });
-}
-
-/**
- * 경로를 정규화하고 BASE_DIR 내부인지 검증합니다.
- * BASE_DIR 외부면 null을 반환합니다.
- */
-export function normalizeAndValidatePath(inputPath: string): string | null {
-    const normalized = normalizePath(inputPath);
-    if (!isPathWithinBaseDir(normalized)) {
+    if (!accessInfo.isWithinBaseDir || accessInfo.isDotPrefixedDirectory) {
         return null;
     }
-    return normalized;
+
+    return normalizedPath;
+}
+
+/**
+ * Check whether the path resolves inside one of the configured base dirs.
+ */
+export function isPathWithinBaseDir(normalizedPath: string): boolean {
+    return getPathAccessInfo(normalizedPath).isWithinBaseDir;
+}
+
+export function isDotPrefixedDirectoryPath(normalizedPath: string): boolean {
+    return getPathAccessInfo(normalizedPath).isDotPrefixedDirectory;
+}
+
+/**
+ * Normalize and validate a path against the configured base dirs.
+ * Returns null for paths outside the base dirs or blocked hidden directories.
+ */
+export function normalizeAndValidatePath(inputPath: string): string | null {
+    return validatePathAgainstBaseDirs(inputPath, BASE_DIRS, PRIMARY_BASE_DIR);
 }
 
 // ============================================
-// 에러 응답 헬퍼
+// Error helpers
 // ============================================
 
 /**
- * 에러 응답 생성 헬퍼
+ * Build a standard error payload for MCP tool responses.
  */
 export function createErrorResponse(message: string) {
     return {
@@ -62,9 +215,17 @@ export function createErrorResponse(message: string) {
 }
 
 /**
- * BASE_DIR 외부 접근 시 에러 응답 생성
+ * Build an access denied response for hidden directories or out-of-base paths.
  */
 export function accessDeniedError(inputPath: string) {
+    const normalizedPath = normalizePath(inputPath);
+    const accessInfo = getPathAccessInfo(normalizedPath);
+    if (accessInfo.isWithinBaseDir && accessInfo.isDotPrefixedDirectory) {
+        return createErrorResponse(
+            `Access denied: hidden/dot-prefixed directories are not allowed: "${inputPath}".`
+        );
+    }
+
     const allowedDirs = BASE_DIRS.join(", ");
     return createErrorResponse(
         `Access denied: "${inputPath}" is outside the allowed directories (${allowedDirs}).`
@@ -84,7 +245,7 @@ export function notMarkdownError(normalizedPath: string) {
 }
 
 // ============================================
-// 파일 유틸리티
+// File utilities
 // ============================================
 
 export async function exists(filePath: string): Promise<boolean> {
@@ -113,12 +274,11 @@ export function isMarkdownFile(filePath: string): boolean {
 }
 
 // ============================================
-// 퍼지 검색
+// Fuzzy search
 // ============================================
 
 /**
- * Levenshtein distance 기반 퍼지 매칭
- * 두 문자열 사이의 편집 거리를 계산합니다.
+ * Compute Levenshtein edit distance between two strings.
  */
 export function levenshteinDistance(a: string, b: string): number {
     const m = a.length;
@@ -134,9 +294,9 @@ export function levenshteinDistance(a: string, b: string): number {
         for (let j = 1; j <= n; j++) {
             const cost = a[i - 1] === b[j - 1] ? 0 : 1;
             dp[i][j] = Math.min(
-                dp[i - 1][j] + 1,      // 삭제
-                dp[i][j - 1] + 1,      // 삽입
-                dp[i - 1][j - 1] + cost // 치환
+                dp[i - 1][j] + 1,
+                dp[i][j - 1] + 1,
+                dp[i - 1][j - 1] + cost
             );
         }
     }
@@ -144,17 +304,14 @@ export function levenshteinDistance(a: string, b: string): number {
 }
 
 /**
- * 퍼지 매칭: 텍스트 내에서 쿼리와 유사한 단어가 있는지 확인
- * 허용 거리 = max(1, floor(query길이 * 0.3))
+ * Check whether text contains a word similar to the query.
  */
 export function fuzzyMatch(text: string, query: string): boolean {
     const textLower = text.toLowerCase();
     const queryLower = query.toLowerCase();
 
-    // 정확히 포함하면 무조건 매칭
     if (textLower.includes(queryLower)) return true;
 
-    // 단어 단위로 비교
     const maxDist = Math.max(1, Math.floor(queryLower.length * 0.3));
     const words = textLower.split(/[\s\-_.,;:!?()\[\]{}"'`\/\\]+/).filter(w => w.length > 0);
 
@@ -167,17 +324,15 @@ export function fuzzyMatch(text: string, query: string): boolean {
 }
 
 // ============================================
-// 쿼리 유틸리티
+// Query utilities
 // ============================================
 
 /**
- * LLM이 여러 JSON 객체를 연결하여 보낸 경우 첫 번째 query만 추출.
- * 예: '{"query":"A"}{"query":"B"}' → 'A'
- * 정상 입력은 그대로 반환.
+ * If an LLM concatenates multiple JSON objects, extract the first query field.
+ * Example: '{"query":"A"}{"query":"B"}' -> 'A'
  */
 export function sanitizeQuery(input: string): string {
     const trimmed = input.trim();
-    // 패턴: {"query":"..."}...{ 형태 감지
     if (trimmed.includes('"}') && trimmed.includes('{"')) {
         const multiJsonPattern = /^\s*\{[^}]*"query"\s*:\s*"([^"]+)"[^}]*\}/;
         const match = trimmed.match(multiJsonPattern);
@@ -189,11 +344,11 @@ export function sanitizeQuery(input: string): string {
 }
 
 // ============================================
-// .gitignore 유틸리티
+// .gitignore utilities
 // ============================================
 
 /**
- * .gitignore 파일들을 읽어서 ignore 인스턴스 생성
+ * Load .gitignore files from the current directory up to the filesystem root.
  */
 export async function loadGitignore(directory: string): Promise<Ignore> {
     const ig = ignore();
@@ -223,11 +378,11 @@ export async function loadGitignore(directory: string): Promise<Ignore> {
 }
 
 // ============================================
-// 마크다운 유틸리티
+// Markdown utilities
 // ============================================
 
 /**
- * YAML 파서 캐싱 (동적 import 오버헤드 제거)
+ * Cache the YAML parser to avoid repeated dynamic-import overhead.
  */
 let yamlParser: { parse: (str: string) => Record<string, unknown> } | null = null;
 
@@ -240,7 +395,7 @@ export async function getYamlParser() {
 }
 
 /**
- * YAML 프론트매터 파싱
+ * Parse YAML frontmatter from markdown content.
  */
 export async function parseFrontmatter(content: string): Promise<Record<string, unknown> | null> {
     const frontmatterRegex = /^---\r?\n([\s\S]*?)\r?\n---/;
@@ -257,7 +412,7 @@ export async function parseFrontmatter(content: string): Promise<Record<string, 
 }
 
 /**
- * 프론트매터 이후의 본문만 추출
+ * Extract the markdown body after frontmatter.
  */
 export function extractBody(content: string): string {
     const frontmatterRegex = /^---\r?\n[\s\S]*?\r?\n---\r?\n?/;

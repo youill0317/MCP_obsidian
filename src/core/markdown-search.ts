@@ -141,6 +141,10 @@ export async function collectMarkdownFiles({
                 return;
             }
 
+            if (entry.isDirectory() && entry.name.startsWith(".")) {
+                continue;
+            }
+
             const fullPath = path.join(currentDir, entry.name);
             const relativePath = path.relative(normalizedRootDir, fullPath);
 

@@ -46,6 +46,7 @@ Add this server entry to Claude Code client JSON (`mcpServers`):
 Notes:
 - `MARKDOWN_BASE_DIR` can contain multiple roots separated by `;` (Windows), for example `C:/VaultA;C:/VaultB`.
 - If `MARKDOWN_BASE_DIR` is omitted, the server uses its current working directory.
+- Dot-prefixed directories such as `.obsidian` and `.git` are always denied, even inside configured base directories.
 
 ## Canonical Workflow (Use This Order)
 
@@ -86,6 +87,11 @@ Notes:
 | `read_markdown_toc` | Read document structure (headers only) | `path`, `maxLevel` |
 | `get_linked_files` | Outgoing links from one note | `path`, `type`, `checkExists` |
 | `get_backlinks` | Incoming links to one target note | `path`, `directory`, `maxResults`, `respectGitignore` |
+
+Path guardrails:
+- Paths must stay inside configured base directories.
+- Dot-prefixed directories are always denied across tools and resources.
+- `showHidden=true` does not expose dot-prefixed directories.
 
 ## Resources (2)
 

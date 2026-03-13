@@ -243,6 +243,8 @@ export function registerBacklinks(server: McpServer) {
                         const dirEntries: string[] = [];
 
                         for (const entry of entries) {
+                            if (entry.isDirectory() && entry.name.startsWith(".")) continue;
+
                             const fullPath = path.join(dir, entry.name);
                             const relativePath = path.relative(normalizedDir, fullPath);
 

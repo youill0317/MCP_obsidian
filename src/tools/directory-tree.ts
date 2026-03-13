@@ -17,7 +17,7 @@ export function registerDirectoryTree(server: McpServer) {
             path: z.string().optional().default(".").describe("Root directory path."),
             depth: z.number().optional().default(3).describe("Maximum depth."),
             markdownOnly: z.boolean().optional().default(true).describe("Show only markdown entries."),
-            showHidden: z.boolean().optional().default(false).describe("Include hidden entries."),
+            showHidden: z.boolean().optional().default(false).describe("Include hidden entries, except dot-prefixed directories which are always denied."),
             respectGitignore: z.boolean().optional().default(true).describe("Apply gitignore filtering."),
         },
         async ({ path: dirPath, depth, markdownOnly, showHidden, respectGitignore }) => {
@@ -52,6 +52,8 @@ export function registerDirectoryTree(server: McpServer) {
 
                     try {
                         let entries = await fs.readdir(dir, { withFileTypes: true });
+
+                        entries = entries.filter((e) => !(e.isDirectory() && e.name.startsWith(".")));
 
                         if (!showHidden) {
                             entries = entries.filter((e) => !e.name.startsWith("."));

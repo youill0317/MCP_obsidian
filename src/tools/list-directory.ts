@@ -16,7 +16,7 @@ export function registerListDirectory(server: McpServer) {
         {
             path: z.string().optional().default(".").describe("Directory path."),
             markdownOnly: z.boolean().optional().default(true).describe("Show only markdown entries."),
-            showHidden: z.boolean().optional().default(false).describe("Include hidden entries."),
+            showHidden: z.boolean().optional().default(false).describe("Include hidden entries, except dot-prefixed directories which are always denied."),
             respectGitignore: z.boolean().optional().default(true).describe("Apply gitignore filtering."),
         },
         async ({ path: dirPath, markdownOnly, showHidden, respectGitignore }) => {
@@ -39,6 +39,8 @@ export function registerListDirectory(server: McpServer) {
                 const ig = respectGitignore ? await loadGitignore(normalizedPath) : null;
 
                 let entries = await fs.readdir(normalizedPath, { withFileTypes: true });
+
+                entries = entries.filter((e) => !(e.isDirectory() && e.name.startsWith(".")));
 
                 if (!showHidden) {
                     entries = entries.filter((e) => !e.name.startsWith("."));

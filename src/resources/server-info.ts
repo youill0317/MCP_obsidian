@@ -18,7 +18,7 @@ export function registerServerInfo(server: McpServer) {
                             baseDirs: BASE_DIRS,
                             features: [
                                 "Unified search across filename, frontmatter tags, and content",
-                                "Directory navigation with markdown and gitignore filters",
+                                "Directory navigation with markdown, gitignore, and dot-prefixed directory access guards",
                                 "TOC extraction and section-level reading",
                                 "Full markdown reading with frontmatter parsing",
                                 "Link extraction and backlink discovery",
@@ -50,6 +50,7 @@ export function registerServerInfo(server: McpServer) {
                             },
                             usageNotes: [
                                 "Use workflow skills such as mcp-obsidian or workflow-orchestrator for detailed tool-order guidance.",
+                                "Dot-prefixed directories are always denied, even inside configured base directories.",
                                 "This resource describes capabilities, not the full decision process.",
                             ],
                         }, null, 2),
